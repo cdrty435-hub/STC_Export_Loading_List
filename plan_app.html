@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>STC 선적 계획 입력</title>
+<style>
+:root {
+  --navy:#1E2D5A; --green:#0F6E56; --greenL:#E1F5EE;
+  --red:#B91C1C;  --redL:#FEE2E2;
+  --blue:#1D4ED8; --blueL:#EFF6FF;
+  --amber:#92400E;--amberL:#FFFBEB;
+  --gray:#F4F5F7; --border:#E2E4E9;
+  --text:#111827; --muted:#6B7280;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gray);color:var(--text);min-height:100vh;}
+
+.top-bar{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;}
+.top-title{font-size:15px;font-weight:700;}
+.top-sub{font-size:11px;color:#93a4c9;margin-top:2px;}
+
+.section{padding:14px 16px;}
+.label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.input{width:100%;padding:11px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;background:#fff;margin-bottom:10px;}
+.input:focus{outline:none;border-color:var(--navy);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+
+/* 품목 선택 */
+.search-wrap{position:relative;margin-bottom:10px;}
+.search-input{width:100%;padding:11px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:#fff;}
+.search-input:focus{outline:none;border-color:var(--navy);}
+.search-drop{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;z-index:50;display:none;box-shadow:0 4px 12px rgba(0,0,0,.1);}
+.search-drop.show{display:block;}
+.drop-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:12px;}
+.drop-item:hover{background:var(--blueL);}
+.drop-item:last-child{border-bottom:none;}
+.drop-code{font-family:monospace;font-size:11px;color:var(--muted);}
+
+/* 선택된 품목 리스트 */
+.plan-list{list-style:none;}
+.plan-item{background:#fff;border-radius:10px;border:1px solid var(--border);padding:12px;margin-bottom:8px;}
+.plan-item-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.plan-name{font-size:13px;font-weight:700;color:var(--navy);flex:1;}
+.plan-code{font-size:10px;font-family:monospace;color:var(--muted);margin-top:2px;}
+.del-btn{background:var(--redL);color:var(--red);border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;flex-shrink:0;}
+.qty-wrap{display:flex;align-items:center;gap:10px;}
+.qty-label{font-size:11px;color:var(--muted);min-width:40px;}
+.qty-ctrl{display:flex;align-items:center;gap:6px;}
+.qty-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--gray);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;}
+.qty-val{font-size:16px;font-weight:700;color:var(--navy);min-width:28px;text-align:center;}
+.cust-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;flex-shrink:0;}
+.shin-badge{background:var(--blueL);color:var(--blue);}
+.sadc-badge{background:var(--amberL);color:var(--amber);}
+
+/* 하단 요약 */
+.summary-bar{background:#fff;border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;}
+.summary-txt{font-size:12px;color:var(--muted);}
+.summary-num{font-size:16px;font-weight:700;color:var(--navy);}
+
+.save-btn{width:calc(100% - 32px);margin:0 16px 16px;padding:14px;border-radius:10px;background:var(--navy);color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;}
+.save-btn:active{background:#131E3E;}
+.save-btn:disabled{background:var(--muted);cursor:not-allowed;}
+
+.empty-txt{text-align:center;color:var(--muted);font-size:13px;padding:24px 0;}
+
+/* 완료 화면 */
+.done-screen{display:none;padding:40px 16px;text-align:center;}
+.done-icon{font-size:60px;margin-bottom:16px;}
+.done-title{font-size:20px;font-weight:700;color:var(--green);margin-bottom:8px;}
+.done-sub{font-size:13px;color:var(--muted);line-height:1.7;}
+.done-btn{margin-top:20px;padding:12px 24px;border-radius:10px;background:var(--navy);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer;}
+
+.pb{height:80px;}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div>
+    <div class="top-title">📋 선적 계획 입력</div>
+    <div class="top-sub" id="top-date"></div>
+  </div>
+</div>
+
+<!-- 기본 정보 -->
+<div class="section">
+  <div class="label">컨테이너 번호 *</div>
+  <input class="input" id="container-no" placeholder="예) CN-2026-0627-A" oninput="checkReady()">
+
+  <div class="row2">
+    <div>
+      <div class="label">담당자 *</div>
+      <input class="input" id="manager" placeholder="이름" oninput="checkReady()">
+    </div>
+    <div>
+      <div class="label">날짜</div>
+      <input class="input" id="plan-date" type="date">
+    </div>
+  </div>
+</div>
+
+<!-- 품목 검색 & 추가 -->
+<div class="section" style="padding-top:0">
+  <div class="label">품목 추가</div>
+  <div class="search-wrap">
+    <input class="search-input" id="search" placeholder="품명 또는 PART CODE 검색..."
+      oninput="searchItems()" onfocus="searchItems()" autocomplete="off">
+    <div class="search-drop" id="search-drop"></div>
+  </div>
+</div>
+
+<!-- 선택된 품목 리스트 -->
+<div class="section" style="padding-top:0">
+  <div class="label">선적 품목 목록 <span id="item-count" style="color:var(--navy);font-weight:700">0개</span></div>
+  <ul class="plan-list" id="plan-list">
+    <li class="empty-txt">위에서 품목을 검색해서 추가하세요</li>
+  </ul>
+</div>
+
+<!-- 완료 화면 -->
+<div class="done-screen" id="done-screen">
+  <div class="done-icon">✅</div>
+  <div class="done-title">계획 저장 완료</div>
+  <div class="done-sub" id="done-sub"></div>
+  <button class="done-btn" onclick="resetForm()">새 계획 입력</button>
+</div>
+
+<div class="pb"></div>
+
+<!-- 하단 -->
+<div class="summary-bar">
+  <div>
+    <div class="summary-txt">총 박스 수량</div>
+    <div class="summary-num" id="total-qty">0 박스</div>
+  </div>
+  <div>
+    <div class="summary-txt">품목 수</div>
+    <div class="summary-num" id="total-items">0 종류</div>
+  </div>
+</div>
+<button class="save-btn" id="save-btn" disabled onclick="savePlan()">💾 계획 저장</button>
+
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxDvomEWRs3JgdTxqBuzi5ggRQY6rzSxV1rXZR6c95Sa35eDN_xqgFGNdldDOIu5xm2pQ/exec";
+
+let MASTER  = [];
+let planMap = {}; // qrKey → { item, qty }
+
+// ── 초기화 ───────────────────────────────────
+window.onload = () => {
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('plan-date').value = today;
+  document.getElementById('top-date').textContent =
+    new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+  loadMaster();
+
+  // 드롭다운 닫기
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.search-wrap'))
+      document.getElementById('search-drop').classList.remove('show');
+  });
+};
+
+async function loadMaster() {
+  try {
+    const res  = await fetch(`${SCRIPT_URL}?action=getMaster`);
+    const data = await res.json();
+    if (data.status === 'ok') MASTER = data.items;
+  } catch(e) {
+    MASTER = getSampleMaster();
+  }
+}
+
+function getSampleMaster() {
+  return [
+    {customer:'SHINANN',partName:'MANIFOLD-COMP QA-QA',partCode:'F543QVAQA03',qrKey:'SHINANN_F543QVAQA03'},
+    {customer:'SHINANN',partName:'CYLINDER HS-15 F',partCode:'F510-CD1AA',qrKey:'SHINANN_F510-CD1AA'},
+    {customer:'SADC',partName:'MANIFOLD ASSY-SUC',partCode:'F543-QB7CB',qrKey:'SADC_F543-QB7CB'},
+  ];
+}
+
+// ── 검색 ─────────────────────────────────────
+function searchItems() {
+  const q   = document.getElementById('search').value.trim().toLowerCase();
+  const drop = document.getElementById('search-drop');
+
+  const filtered = q.length < 1
+    ? MASTER.slice(0, 30)
+    : MASTER.filter(m =>
+        m.partName.toLowerCase().includes(q) ||
+        m.partCode.toLowerCase().includes(q) ||
+        m.customer.toLowerCase().includes(q)
+      ).slice(0, 20);
+
+  if (filtered.length === 0) {
+    drop.innerHTML = '<div class="drop-item" style="color:var(--muted)">검색 결과 없음</div>';
+  } else {
+    drop.innerHTML = filtered.map(m => `
+      <div class="drop-item" onclick="addItem('${m.qrKey}')">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:600;font-size:12px">${m.partName}</span>
+          <span class="cust-badge ${m.customer==='SHINANN'?'shin-badge':'sadc-badge'}">${m.customer}</span>
+        </div>
+        <div class="drop-code">${m.partCode}</div>
+      </div>`).join('');
+  }
+  drop.classList.add('show');
+}
+
+// ── 품목 추가 ─────────────────────────────────
+function addItem(qrKey) {
+  const item = MASTER.find(m => m.qrKey === qrKey);
+  if (!item) return;
+  if (planMap[qrKey]) {
+    // 이미 있으면 수량만 +1
+    planMap[qrKey].qty++;
+    renderList();
+    return;
+  }
+  planMap[qrKey] = { item, qty: 1 };
+  renderList();
+  document.getElementById('search').value = '';
+  document.getElementById('search-drop').classList.remove('show');
+  document.getElementById('search').focus();
+}
+
+// ── 수량 변경 ─────────────────────────────────
+function changeQty(qrKey, delta) {
+  if (!planMap[qrKey]) return;
+  planMap[qrKey].qty = Math.max(1, planMap[qrKey].qty + delta);
+  renderList();
+}
+
+// ── 삭제 ─────────────────────────────────────
+function removeItem(qrKey) {
+  delete planMap[qrKey];
+  renderList();
+}
+
+// ── 리스트 렌더 ───────────────────────────────
+function renderList() {
+  const ul    = document.getElementById('plan-list');
+  const keys  = Object.keys(planMap);
+  const count = keys.length;
+  const totalQty = keys.reduce((s,k) => s+planMap[k].qty, 0);
+
+  document.getElementById('item-count').textContent  = `${count}개`;
+  document.getElementById('total-qty').textContent   = `${totalQty} 박스`;
+  document.getElementById('total-items').textContent = `${count} 종류`;
+
+  if (count === 0) {
+    ul.innerHTML = '<li class="empty-txt">위에서 품목을 검색해서 추가하세요</li>';
+    checkReady();
+    return;
+  }
+
+  ul.innerHTML = keys.map(k => {
+    const { item, qty } = planMap[k];
+    const isShin = item.customer === 'SHINANN';
+    return `
+    <li class="plan-item">
+      <div class="plan-item-top">
+        <div>
+          <div class="plan-name">${item.partName}</div>
+          <div class="plan-code">${item.partCode}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="cust-badge ${isShin?'shin-badge':'sadc-badge'}">${item.customer}</span>
+          <button class="del-btn" onclick="removeItem('${k}')">✕</button>
+        </div>
+      </div>
+      <div class="qty-wrap">
+        <span class="qty-label">박스 수량</span>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty('${k}',-1)">−</button>
+          <span class="qty-val">${qty}</span>
+          <button class="qty-btn" onclick="changeQty('${k}',1)">＋</button>
+        </div>
+        <span style="font-size:11px;color:var(--muted);margin-left:4px">박스</span>
+      </div>
+    </li>`;
+  }).join('');
+
+  checkReady();
+}
+
+// ── 저장 버튼 활성화 ─────────────────────────
+function checkReady() {
+  const cn  = document.getElementById('container-no').value.trim();
+  const mgr = document.getElementById('manager').value.trim();
+  const ok  = cn && mgr && Object.keys(planMap).length > 0;
+  document.getElementById('save-btn').disabled = !ok;
+}
+
+// ── 계획 저장 ─────────────────────────────────
+async function savePlan() {
+  const containerNo = document.getElementById('container-no').value.trim();
+  const manager     = document.getElementById('manager').value.trim();
+  const date        = document.getElementById('plan-date').value;
+  const items       = Object.keys(planMap).map(k => ({
+    qrKey    : k,
+    partCode : planMap[k].item.partCode,
+    partName : planMap[k].item.partName,
+    customer : planMap[k].item.customer,
+    planQty  : planMap[k].qty,
+  }));
+
+  document.getElementById('save-btn').disabled = true;
+  document.getElementById('save-btn').textContent = '저장 중...';
+
+  try {
+    const res  = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body  : JSON.stringify({ action:'savePlan', containerNo, manager, date, items }),
+    });
+    const data = await res.json();
+
+    if (data.status === 'ok') {
+      showDone(containerNo, items, manager);
+    } else {
+      alert(`저장 실패: ${data.msg}`);
+    }
+  } catch(e) {
+    // 오프라인 테스트
+    showDone(containerNo, items, manager);
+  }
+
+  document.getElementById('save-btn').disabled = false;
+  document.getElementById('save-btn').textContent = '💾 계획 저장';
+}
+
+function showDone(containerNo, items, manager) {
+  const totalQty = items.reduce((s,i)=>s+i.planQty, 0);
+  document.querySelector('.section').style.display    = 'none';
+  document.querySelector('.section:nth-child(3)').style.display = 'none';
+  document.querySelector('.section:nth-child(4)').style.display = 'none';
+  document.getElementById('done-screen').style.display = 'block';
+  document.getElementById('done-sub').innerHTML =
+    `컨테이너: <b>${containerNo}</b><br>` +
+    `담당자: ${manager}<br>` +
+    `${items.length}종 / ${totalQty}박스 계획 저장됨<br><br>` +
+    `작업자에게 스캔 앱 링크를 전달하세요.`;
+}
+
+function resetForm() {
+  planMap = {};
+  document.getElementById('container-no').value = '';
+  document.getElementById('manager').value = '';
+  document.querySelectorAll('.section').forEach(s => s.style.display = 'block');
+  document.getElementById('done-screen').style.display = 'none';
+  renderList();
+}
+</script>
+</body>
+</html>

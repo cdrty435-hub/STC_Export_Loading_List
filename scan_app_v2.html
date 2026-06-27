@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>STC 적재 스캔</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root {
+  --navy:#1E2D5A; --green:#0F6E56; --greenL:#D1FAE5;
+  --red:#B91C1C;  --redL:#FEE2E2;
+  --amber:#D97706;--amberL:#FEF3C7;
+  --blue:#1D4ED8; --blueL:#EFF6FF;
+  --gray:#F4F5F7; --border:#E2E4E9;
+  --text:#111827; --muted:#6B7280;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gray);color:var(--text);min-height:100vh;}
+
+/* ── 시작 화면 ── */
+#start-screen{padding:32px 20px;max-width:400px;margin:0 auto;}
+.start-logo{text-align:center;font-size:52px;margin-bottom:8px;}
+.start-title{text-align:center;font-size:20px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.start-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:28px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;}
+.field input,.field select{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;background:#fff;}
+.field input:focus,.field select:focus{outline:none;border-color:var(--navy);}
+.start-btn{width:100%;padding:15px;border-radius:12px;background:var(--navy);color:#fff;font-size:16px;font-weight:700;border:none;cursor:pointer;margin-top:8px;}
+.start-btn:active{background:#131E3E;}
+
+/* ── 메인 화면 ── */
+#main-screen{display:none;}
+
+.top-bar{background:var(--navy);color:#fff;padding:11px 16px;display:flex;align-items:center;justify-content:space-between;}
+.top-left .t-title{font-size:14px;font-weight:700;}
+.top-left .t-sub{font-size:10px;color:#93a4c9;margin-top:1px;}
+.top-right{text-align:right;}
+.top-clock{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;}
+.top-date{font-size:10px;color:#93a4c9;}
+
+/* KPI 띠 */
+.kpi-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);}
+.kpi-box{background:#fff;padding:9px 4px;text-align:center;}
+.kpi-v{font-size:20px;font-weight:700;}
+.kpi-l{font-size:9px;color:var(--muted);margin-top:1px;}
+.c-navy{color:var(--navy);}.c-green{color:var(--green);}.c-red{color:var(--red);}
+
+/* 카메라 */
+.cam-section{padding:12px 14px;}
+.sec-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+#qr-reader{width:100%;border-radius:12px;overflow:hidden;border:2px solid var(--navy);background:#000;max-height:240px;}
+
+/* 스캔 결과 카드 */
+.result-card{margin:12px 14px 0;border-radius:12px;padding:14px;display:none;border:2px solid;}
+.result-card.ok   {background:#fff;border-color:var(--green);}
+.result-card.err  {background:var(--redL);border-color:#FCA5A5;}
+.result-card.warn {background:var(--amberL);border-color:#FCD34D;}
+.result-card.over {background:var(--redL);border-color:#FCA5A5;}
+
+.rc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.rc-name{font-size:15px;font-weight:700;color:var(--navy);flex:1;}
+.rc-code{font-size:11px;font-family:monospace;color:var(--muted);margin-top:2px;}
+.rc-cust{font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;}
+.shin{background:var(--blueL);color:var(--blue);}
+.sadc{background:var(--amberL);color:var(--amber);}
+
+/* 진행 바 */
+.prog-section{margin:6px 0 10px;}
+.prog-nums{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;}
+.prog-scanned{font-size:22px;font-weight:700;color:var(--navy);}
+.prog-total{font-size:13px;color:var(--muted);align-self:flex-end;margin-bottom:2px;}
+.prog-bg{height:14px;background:#E5E7EB;border-radius:7px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:7px;transition:width .5s ease;}
+.fill-ok   {background:var(--green);}
+.fill-prog {background:var(--blue);}
+.fill-over {background:var(--red);}
+.prog-boxes{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;}
+.prog-box{width:22px;height:22px;border-radius:4px;border:2px solid #E5E7EB;background:#F9FAFB;}
+.prog-box.filled{background:var(--green);border-color:var(--green);}
+.prog-box.over{background:var(--red);border-color:var(--red);}
+
+/* 저장 버튼 */
+.save-btn{width:100%;padding:13px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;}
+.save-btn.active{background:var(--green);color:#fff;}
+.save-btn.done  {background:var(--green);color:#fff;opacity:.6;cursor:default;}
+.save-btn:disabled{background:var(--muted);color:#fff;cursor:not-allowed;}
+
+/* 오류 메시지 */
+.err-msg{font-size:14px;font-weight:700;margin-bottom:4px;}
+.err-sub{font-size:12px;opacity:.8;}
+
+/* 품목 리스트 */
+.items-section{padding:10px 14px 80px;}
+.items-list{list-style:none;}
+.item-row{background:#fff;border-radius:10px;border:1px solid var(--border);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;}
+.item-row.done-row{border-color:#6EE7B7;background:var(--greenL);}
+.item-row.prog-row{border-color:#93C5FD;}
+.ir-left{flex:1;min-width:0;}
+.ir-name{font-size:12px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ir-code{font-size:10px;font-family:monospace;color:var(--muted);}
+.ir-right{text-align:right;flex-shrink:0;}
+.ir-qty{font-size:14px;font-weight:700;}
+.ir-status{font-size:10px;font-weight:600;}
+.mini-bar{height:4px;background:#E5E7EB;border-radius:2px;overflow:hidden;margin-top:4px;min-width:60px;}
+.mini-fill{height:100%;border-radius:2px;background:var(--green);}
+
+/* 로딩 */
+.loading{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:10px;}
+.loading.show{display:flex;}
+.spinner{width:36px;height:36px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{color:#fff;font-size:13px;font-weight:600;}
+
+.pb{height:80px;}
+</style>
+</head>
+<body>
+
+<!-- ── 시작 화면 ── -->
+<div id="start-screen">
+  <div class="start-logo">📦</div>
+  <div class="start-title">STC 적재 스캔</div>
+  <div class="start-sub">수출 적재 QR 확인 시스템</div>
+
+  <div class="field">
+    <label>컨테이너 번호 *</label>
+    <input id="s-container" placeholder="예) CN-2026-0627-A" oninput="checkStart()">
+  </div>
+  <div class="field">
+    <label>작업자 이름 *</label>
+    <input id="s-worker" placeholder="이름 입력" oninput="checkStart()">
+  </div>
+  <button class="start-btn" id="start-btn" disabled onclick="startScan()">📷 스캔 시작</button>
+</div>
+
+<!-- ── 메인 화면 ── -->
+<div id="main-screen">
+  <div class="top-bar">
+    <div class="top-left">
+      <div class="t-title" id="t-container">CN-—</div>
+      <div class="t-sub" id="t-worker">작업자: —</div>
+    </div>
+    <div class="top-right">
+      <div class="top-clock" id="clock"></div>
+      <div class="top-date" id="datedisp"></div>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi-box"><div class="kpi-v c-navy" id="k-total">0</div><div class="kpi-l">총 품목</div></div>
+    <div class="kpi-box"><div class="kpi-v c-green" id="k-done">0</div><div class="kpi-l">완료</div></div>
+    <div class="kpi-box"><div class="kpi-v c-red" id="k-miss">0</div><div class="kpi-l">미완료</div></div>
+  </div>
+
+  <!-- 카메라 -->
+  <div class="cam-section">
+    <div class="sec-label">📷 QR 스캔</div>
+    <div id="qr-reader"></div>
+  </div>
+
+  <!-- 스캔 결과 -->
+  <div class="result-card" id="result-card">
+    <!-- JS 렌더 -->
+  </div>
+
+  <!-- 품목 진행 현황 -->
+  <div class="items-section">
+    <div class="sec-label" style="margin-bottom:8px">품목별 진행 현황</div>
+    <ul class="items-list" id="items-list">
+      <li style="text-align:center;color:var(--muted);font-size:12px;padding:16px">로딩 중...</li>
+    </ul>
+  </div>
+
+  <div class="pb"></div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-txt" id="loading-txt">처리 중...</div>
+</div>
+
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxDvomEWRs3JgdTxqBuzi5ggRQY6rzSxV1rXZR6c95Sa35eDN_xqgFGNdldDOIu5xm2pQ/exec";
+
+let CFG       = { container:'', worker:'', date:'' };
+let PLAN      = [];   // 당일 계획 [{ qrKey, partName, partCode, customer, planQty, scanned }]
+let qrScanner = null;
+let lastQR    = '';
+let lastQRTime= 0;
+
+// ── 시작 화면 ───────────────────────────────
+function checkStart() {
+  const c = document.getElementById('s-container').value.trim();
+  const w = document.getElementById('s-worker').value.trim();
+  document.getElementById('start-btn').disabled = !(c && w);
+}
+
+async function startScan() {
+  CFG.container = document.getElementById('s-container').value.trim();
+  CFG.worker    = document.getElementById('s-worker').value.trim();
+  CFG.date      = new Date().toISOString().slice(0,10);
+
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('main-screen').style.display  = 'block';
+  document.getElementById('t-container').textContent    = CFG.container;
+  document.getElementById('t-worker').textContent       = `작업자: ${CFG.worker}`;
+
+  startClock();
+  await loadPlan();
+  initCamera();
+}
+
+// ── 시계 ────────────────────────────────────
+function startClock() {
+  const tick = () => {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('ko-KR',{hour12:false});
+    document.getElementById('datedisp').textContent =
+      now.toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'});
+  };
+  tick(); setInterval(tick,1000);
+}
+
+// ── 계획 로드 ────────────────────────────────
+async function loadPlan() {
+  showLoading('계획 로딩 중...');
+  try {
+    const res  = await fetch(`${SCRIPT_URL}?action=getStatus&containerNo=${encodeURIComponent(CFG.container)}&date=${CFG.date}`);
+    const data = await res.json();
+    if (data.status === 'ok') {
+      PLAN = data.data.plan.map(p => ({ ...p, scanned: p.scanned || 0 }));
+    } else {
+      PLAN = getSamplePlan();
+    }
+  } catch(e) {
+    PLAN = getSamplePlan();
+  }
+  hideLoading();
+  renderAll();
+}
+
+function getSamplePlan() {
+  return [
+    {qrKey:'SHINANN_F543QVAQA03',partName:'MANIFOLD-COMP QA-QA',partCode:'F543QVAQA03',customer:'SHINANN',planQty:3,scanned:0,isDone:false},
+    {qrKey:'SHINANN_F510-CD1AA', partName:'CYLINDER HS-15 F',    partCode:'F510-CD1AA', customer:'SHINANN',planQty:5,scanned:2,isDone:false},
+    {qrKey:'SADC_F543-QB7CB',    partName:'MANIFOLD ASSY-SUC',   partCode:'F543-QB7CB', customer:'SADC',   planQty:2,scanned:2,isDone:true},
+  ];
+}
+
+// ── 카메라 ───────────────────────────────────
+function initCamera() {
+  qrScanner = new Html5Qrcode("qr-reader");
+  qrScanner.start(
+    { facingMode:"environment" },
+    { fps:12, qrbox:{ width:220, height:220 } },
+    onQRScan,
+    ()=>{}
+  ).catch(() => {
+    document.getElementById('qr-reader').innerHTML =
+      '<div style="padding:20px;text-align:center;color:#fff;font-size:13px">카메라 접근 불가<br>수동 입력을 이용하세요</div>';
+  });
+}
+
+// ── QR 스캔 콜백 ─────────────────────────────
+function onQRScan(text) {
+  const now = Date.now();
+  if (text === lastQR && now - lastQRTime < 2000) return; // 2초 중복 방지
+  lastQR = text; lastQRTime = now;
+  processScan(text);
+}
+
+// ── 스캔 처리 ────────────────────────────────
+async function processScan(qrKey) {
+  // 계획에 있는 품목인지 확인
+  const item = PLAN.find(p => p.qrKey === qrKey);
+
+  if (!item) {
+    showResult('err', null, '오적재 감지!', `[${qrKey}]<br>이 컨테이너 계획에 없는 품목입니다`);
+    vibrate([200,100,200]);
+    return;
+  }
+
+  if (item.isDone) {
+    showResult('over', item, '이미 완료된 품목', `예정 ${item.planQty}박스 스캔 완료됨`);
+    vibrate([100]);
+    return;
+  }
+
+  // Apps Script에 스캔 전송
+  showLoading('스캔 기록 중...');
+  try {
+    const res  = await fetch(SCRIPT_URL, {
+      method:'POST',
+      body: JSON.stringify({
+        action      : 'scan',
+        containerNo : CFG.container,
+        qrKey,
+        scanBy      : CFG.worker,
+        date        : CFG.date,
+      }),
+    });
+    const data = await res.json();
+
+    if (data.status === 'ok') {
+      // 로컬 상태 업데이트
+      item.scanned = data.current;
+      item.isDone  = data.isDone;
+      renderAll();
+      showResultOK(item, data);
+      vibrate(data.isDone ? [50,50,100,50,100] : [50]);
+    } else if (data.code === 'OVER_SCAN') {
+      showResult('over', item, '초과 스캔!', `예정 ${item.planQty}박스 이미 완료`);
+      vibrate([100]);
+    } else {
+      showResult('err', null, '오류', data.msg);
+    }
+  } catch(e) {
+    // 오프라인 — 로컬만 카운트
+    item.scanned = Math.min(item.scanned+1, item.planQty);
+    item.isDone  = item.scanned >= item.planQty;
+    renderAll();
+    showResultOK(item, { current:item.scanned, planQty:item.planQty, isDone:item.isDone });
+    vibrate(item.isDone ? [50,50,100] : [50]);
+  }
+  hideLoading();
+}
+
+// ── 결과 카드 렌더 ───────────────────────────
+function showResultOK(item, data) {
+  const pct    = Math.round(data.current/data.planQty*100);
+  const isShin = item.customer === 'SHINANN';
+
+  // 박스 아이콘 배열 (최대 10개)
+  const maxBoxes = Math.min(item.planQty, 10);
+  const boxes = Array.from({length:maxBoxes}, (_,i) => {
+    const filled = i < Math.min(data.current, maxBoxes);
+    return `<div class="prog-box ${filled?'filled':''}"></div>`;
+  }).join('');
+
+  const card = document.getElementById('result-card');
+  card.className = `result-card ${data.isDone?'ok':'ok'}`;
+  card.style.display = 'block';
+  card.innerHTML = `
+    <div class="rc-header">
+      <div>
+        <div class="rc-name">${item.partName}</div>
+        <div class="rc-code">${item.partCode}</div>
+      </div>
+      <span class="rc-cust ${isShin?'shin':'sadc'}">${item.customer}</span>
+    </div>
+    <div class="prog-section">
+      <div class="prog-nums">
+        <span class="prog-scanned">${data.current}</span>
+        <span class="prog-total">/ ${data.planQty} 박스</span>
+      </div>
+      <div class="prog-bg">
+        <div class="prog-fill ${data.isDone?'fill-ok':'fill-prog'}"
+          style="width:${pct}%"></div>
+      </div>
+      <div class="prog-boxes" style="margin-top:8px">${boxes}</div>
+    </div>
+    ${data.isDone
+      ? `<div style="text-align:center;font-size:18px;font-weight:700;color:var(--green);padding:4px 0">✅ 완료!</div>`
+      : `<div style="text-align:center;font-size:13px;color:var(--muted)">남은 수량: ${data.planQty - data.current}박스</div>`
+    }`;
+}
+
+function showResult(type, item, title, sub) {
+  const card = document.getElementById('result-card');
+  card.className = `result-card ${type}`;
+  card.style.display = 'block';
+  const icon = type==='err'?'❌':type==='over'?'⚠️':type==='warn'?'⚠️':'✅';
+  card.innerHTML = `
+    <div class="err-msg">${icon} ${title}</div>
+    <div class="err-sub">${sub}</div>`;
+}
+
+// ── KPI & 품목 리스트 렌더 ───────────────────
+function renderAll() {
+  const total = PLAN.length;
+  const done  = PLAN.filter(p=>p.isDone).length;
+  const miss  = total - done;
+
+  document.getElementById('k-total').textContent = total;
+  document.getElementById('k-done').textContent  = done;
+  document.getElementById('k-miss').textContent  = miss;
+
+  const ul = document.getElementById('items-list');
+  ul.innerHTML = PLAN.map(p => {
+    const pct     = p.planQty ? Math.round(p.scanned/p.planQty*100) : 0;
+    const rowClass= p.isDone ? 'done-row' : p.scanned>0 ? 'prog-row' : '';
+    const qtyColor= p.isDone ? 'color:var(--green)' : p.scanned>0 ? 'color:var(--blue)' : 'color:var(--red)';
+    const statusTxt= p.isDone ? '✅ 완료' : p.scanned>0 ? `${p.scanned}/${p.planQty}` : '미스캔';
+    const statusColor= p.isDone?'color:var(--green)':p.scanned>0?'color:var(--blue)':'color:var(--red)';
+    return `
+    <li class="item-row ${rowClass}" onclick="manualScan('${p.qrKey}')">
+      <div class="ir-left">
+        <div class="ir-name">${p.partName}</div>
+        <div class="ir-code">${p.partCode}</div>
+        <div class="mini-bar"><div class="mini-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="ir-right">
+        <div class="ir-qty" style="${qtyColor}">${p.scanned}<span style="font-size:10px;color:var(--muted)">/${p.planQty}</span></div>
+        <div class="ir-status" style="${statusColor}">${statusTxt}</div>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+// ── 리스트 터치로 수동 스캔 ──────────────────
+function manualScan(qrKey) {
+  if (confirm(`수동 스캔:\n${qrKey}\n\n스캔 처리하시겠습니까?`)) {
+    processScan(qrKey);
+  }
+}
+
+// ── 유틸 ────────────────────────────────────
+function showLoading(msg='처리 중...') {
+  document.getElementById('loading-txt').textContent = msg;
+  document.getElementById('loading').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading').classList.remove('show');
+}
+function vibrate(p) {
+  if (navigator.vibrate) navigator.vibrate(p);
+}
+</script>
+</body>
+</html>
