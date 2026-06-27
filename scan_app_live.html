@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>STC 적재 스캔 앱</title>
+<!-- QR 스캔 라이브러리 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root {
+  --navy:    #1E2D5A;
+  --green:   #0F6E56;
+  --greenL:  #E1F5EE;
+  --red:     #B91C1C;
+  --redL:    #FEE2E2;
+  --amber:   #92400E;
+  --amberL:  #FFFBEB;
+  --blue:    #1D4ED8;
+  --blueL:   #EFF6FF;
+  --gray:    #F4F5F7;
+  --border:  #E2E4E9;
+  --text:    #111827;
+  --muted:   #6B7280;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: var(--gray);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── 설정 화면 ── */
+#setup-screen {
+  padding: 24px 16px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.setup-title {
+  font-size: 20px; font-weight: 700; color: var(--navy);
+  margin-bottom: 4px;
+}
+.setup-sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; font-weight: 600;
+  color: var(--muted); margin-bottom: 4px; }
+.field input, .field select {
+  width: 100%; padding: 10px 12px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 14px; background: #fff;
+}
+.field input:focus, .field select:focus {
+  outline: none; border-color: var(--navy);
+}
+.start-btn {
+  width: 100%; padding: 14px; border-radius: 10px;
+  background: var(--navy); color: #fff;
+  font-size: 15px; font-weight: 700; border: none; cursor: pointer;
+  margin-top: 4px;
+}
+.start-btn:active { background: #131E3E; }
+
+/* ── 메인 스캔 화면 ── */
+#main-screen { display: none; }
+
+.top-bar {
+  background: var(--navy); color: #fff;
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.top-title { font-size: 15px; font-weight: 700; }
+.top-user { font-size: 11px; color: #93a4c9; }
+
+.kpi-strip {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 1px; background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.kpi-box {
+  background: #fff; padding: 10px 8px; text-align: center;
+}
+.kpi-val { font-size: 22px; font-weight: 700; }
+.kpi-lbl { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.val-ok    { color: var(--green); }
+.val-miss  { color: var(--red); }
+.val-navy  { color: var(--navy); }
+
+/* ── 스캔 영역 ── */
+.scan-section { padding: 14px 16px; }
+.scan-label {
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+#qr-reader {
+  width: 100%; border-radius: 12px; overflow: hidden;
+  border: 2px solid var(--navy);
+  background: #000;
+}
+
+.scan-status {
+  margin-top: 12px; padding: 12px 14px;
+  border-radius: 10px; font-size: 13px;
+  display: none;
+}
+.scan-status.ok    { background: var(--greenL); color: var(--green); border: 1px solid #6EE7B7; }
+.scan-status.err   { background: var(--redL);   color: var(--red);   border: 1px solid #FCA5A5; }
+.scan-status.warn  { background: var(--amberL); color: var(--amber); border: 1px solid #FCD34D; }
+.scan-status.info  { background: var(--blueL);  color: var(--blue);  border: 1px solid #BFDBFE; }
+
+.status-icon { font-size: 18px; margin-right: 6px; }
+.status-part { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+.status-code { font-family: monospace; font-size: 12px; opacity: 0.8; }
+
+/* ── 수동 입력 ── */
+.manual-wrap {
+  display: flex; gap: 8px; margin-top: 12px;
+}
+.manual-input {
+  flex: 1; padding: 10px 12px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 13px; font-family: monospace;
+}
+.manual-btn {
+  padding: 10px 14px; border-radius: 8px;
+  background: var(--navy); color: #fff;
+  border: none; font-size: 13px; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ── 팔레트 / 수량 입력 ── */
+.detail-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin-top: 10px;
+}
+.detail-field label {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  display: block; margin-bottom: 3px;
+}
+.detail-field input, .detail-field select {
+  width: 100%; padding: 9px 10px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 13px;
+}
+
+.submit-btn {
+  width: 100%; margin-top: 12px; padding: 13px;
+  border-radius: 10px; background: var(--green); color: #fff;
+  font-size: 14px; font-weight: 700; border: none; cursor: pointer;
+}
+.submit-btn:disabled { background: var(--muted); cursor: not-allowed; }
+.submit-btn:active:not(:disabled) { background: var(--navy); }
+
+/* ── 스캔 로그 ── */
+.log-section { padding: 0 16px 16px; }
+.log-title {
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 8px; padding-top: 4px;
+}
+.log-list { list-style: none; }
+.log-item {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 8px 10px; background: #fff;
+  border-radius: 8px; margin-bottom: 6px;
+  border: 1px solid var(--border); font-size: 12px;
+}
+.log-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 3px;
+}
+.dot-ok   { background: var(--green); }
+.dot-err  { background: var(--red); }
+.dot-warn { background: #F59E0B; }
+.log-time { color: var(--muted); min-width: 44px; }
+.log-desc { color: var(--text); flex: 1; }
+
+/* ── 로딩 ── */
+.loading-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4);
+  align-items: center; justify-content: center;
+  z-index: 100; flex-direction: column; gap: 12px;
+}
+.loading-overlay.show { display: flex; }
+.spinner {
+  width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { color: #fff; font-size: 14px; font-weight: 600; }
+
+/* ── 설정 탭 버튼 ── */
+.bottom-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #fff; border-top: 1px solid var(--border);
+  display: flex; padding: 8px 16px 12px;
+  gap: 8px;
+}
+.bb-btn {
+  flex: 1; padding: 9px; border-radius: 8px;
+  font-size: 12px; font-weight: 600; border: 1.5px solid var(--border);
+  background: var(--gray); color: var(--muted); cursor: pointer;
+}
+.bb-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.bb-btn.danger { background: var(--redL); color: var(--red); border-color: #FCA5A5; }
+
+.pb { height: 72px; }
+</style>
+</head>
+<body>
+
+<!-- ── 설정 화면 ── -->
+<div id="setup-screen">
+  <div style="text-align:center; padding: 20px 0 16px">
+    <div style="font-size:40px">📦</div>
+    <div class="setup-title">STC 적재 스캔 앱</div>
+    <div class="setup-sub">수출 적재 QR 확인 시스템</div>
+  </div>
+
+  <div class="field">
+    <label>Apps Script URL *</label>
+    <input id="cfg-url" type="url"
+      placeholder="https://script.google.com/macros/s/..."
+      value="https://script.google.com/macros/s/AKfycbxDvomEWRs3JgdTxqBuzi5ggRQY6rzSxV1rXZR6c95Sa35eDN_xqgFGNdldDOIu5xm2pQ/exec">
+  </div>
+  <div class="field">
+    <label>작업자 이름 *</label>
+    <input id="cfg-name" type="text" placeholder="Kim, Lee ...">
+  </div>
+  <div class="field">
+    <label>컨테이너 번호</label>
+    <input id="cfg-container" type="text" placeholder="CN-2026-0627-A">
+  </div>
+  <button class="start-btn" onclick="startApp()">🚀 스캔 시작</button>
+
+  <div style="margin-top:16px; padding:12px; background:#fff; border-radius:10px;
+    border:1px solid var(--border); font-size:11px; color:var(--muted); line-height:1.7">
+    <b style="color:var(--navy)">설정 방법</b><br>
+    1. Google Sheets → 확장 프로그램 → Apps Script<br>
+    2. Apps_Script_Code.gs 코드 붙여넣기<br>
+    3. 배포 → 웹 앱 → URL 복사 후 위에 붙여넣기
+  </div>
+</div>
+
+<!-- ── 메인 스캔 화면 ── -->
+<div id="main-screen">
+  <div class="top-bar">
+    <div>
+      <div class="top-title">📦 STC 적재 스캔</div>
+      <div class="top-user" id="top-user-info">작업자: — | 컨테이너: —</div>
+    </div>
+    <div style="font-size:11px; color:#93a4c9" id="top-clock"></div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi-box">
+      <div class="kpi-val val-navy" id="k-total">0</div>
+      <div class="kpi-lbl">총 품목</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-val val-ok" id="k-done">0</div>
+      <div class="kpi-lbl">스캔 완료</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-val val-miss" id="k-miss">0</div>
+      <div class="kpi-lbl">미스캔</div>
+    </div>
+  </div>
+
+  <div class="scan-section">
+    <div class="scan-label">📷 QR 코드 스캔</div>
+    <div id="qr-reader"></div>
+
+    <div class="scan-status" id="scan-status"></div>
+
+    <div class="scan-label" style="margin-top:14px">수동 입력 (카메라 미사용 시)</div>
+    <div class="manual-wrap">
+      <input class="manual-input" id="manual-input"
+        placeholder="QR KEY 직접 입력 (예: SHINANN_F543QVAQA03)"
+        onkeydown="if(event.key==='Enter') manualScan()">
+      <button class="manual-btn" onclick="manualScan()">확인</button>
+    </div>
+
+    <div class="detail-row" id="detail-section" style="display:none">
+      <div class="detail-field">
+        <label>팔레트 번호</label>
+        <select id="d-pallet">
+          <option value="">선택</option>
+          <option>PLT-01</option><option>PLT-02</option>
+          <option>PLT-03</option><option>PLT-04</option>
+          <option>PLT-05</option><option>PLT-06</option>
+        </select>
+      </div>
+      <div class="detail-field">
+        <label>박스 수량</label>
+        <input type="number" id="d-qty" value="1" min="1" max="99">
+      </div>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" disabled onclick="submitScan()">
+      ✅ 스캔 기록 저장
+    </button>
+  </div>
+
+  <div class="log-section">
+    <div class="log-title">이번 세션 스캔 이력</div>
+    <ul class="log-list" id="log-list"></ul>
+  </div>
+
+  <div class="pb"></div>
+
+  <div class="bottom-bar">
+    <button class="bb-btn" onclick="refreshMaster()">🔄 목록 갱신</button>
+    <button class="bb-btn danger" onclick="resetApp()">⚙ 재설정</button>
+  </div>
+</div>
+
+<!-- 로딩 -->
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">처리 중...</div>
+</div>
+
+<script>
+// ── 전역 상태 ──────────────────────────────────
+let CFG = { url:'', name:'', container:'' };
+let MASTER = [];    // PARTS_MASTER 목록
+let scanned = {};   // { qrKey: true } 이번 세션 스캔한 것
+let pendingQR = null;  // 스캔됐지만 아직 저장 안 된 QR
+let html5QrCode = null;
+
+// ── 설정 저장/로드 ─────────────────────────────
+function saveCfg() {
+  localStorage.setItem('stc_cfg', JSON.stringify(CFG));
+}
+function loadCfg() {
+  try {
+    const s = localStorage.getItem('stc_cfg');
+    if (s) CFG = JSON.parse(s);
+  } catch(e) {}
+}
+
+// ── 앱 시작 ───────────────────────────────────
+function startApp() {
+  const url  = document.getElementById('cfg-url').value.trim();
+  const name = document.getElementById('cfg-name').value.trim();
+  const cont = document.getElementById('cfg-container').value.trim();
+  if (!url || !name) { alert('Apps Script URL과 작업자 이름을 입력해 주세요.'); return; }
+  CFG = { url, name, container: cont };
+  saveCfg();
+  showMainScreen();
+}
+
+function showMainScreen() {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('main-screen').style.display  = 'block';
+  document.getElementById('top-user-info').textContent =
+    `작업자: ${CFG.name} | 컨테이너: ${CFG.container || '-'}`;
+  startClock();
+  loadMaster();
+  startQR();
+}
+
+function resetApp() {
+  if (!confirm('재설정 하시겠습니까? 현재 스캔 세션이 초기화됩니다.')) return;
+  stopQR();
+  scanned = {}; pendingQR = null;
+  document.getElementById('setup-screen').style.display = 'block';
+  document.getElementById('main-screen').style.display  = 'none';
+}
+
+// ── 시계 ──────────────────────────────────────
+function startClock() {
+  const el = document.getElementById('top-clock');
+  const tick = () => {
+    el.textContent = new Date().toLocaleTimeString('ko-KR',{hour12:false});
+  };
+  tick(); setInterval(tick, 1000);
+}
+
+// ── 마스터 로드 ───────────────────────────────
+async function loadMaster() {
+  showLoading('품목 목록 로딩 중...');
+  try {
+    const res = await fetch(`${CFG.url}?action=getMaster`);
+    const data = await res.json();
+    if (data.status === 'ok') {
+      MASTER = data.items;
+      updateKPI();
+    } else {
+      addLog('err', `마스터 로드 실패: ${data.msg}`);
+    }
+  } catch(e) {
+    // URL 미설정 상태에서는 샘플 데이터로 동작
+    MASTER = getSampleMaster();
+    updateKPI();
+    addLog('warn', 'Apps Script 미연결 — 샘플 데이터로 동작 중');
+  }
+  hideLoading();
+}
+
+function refreshMaster() { loadMaster(); }
+
+function getSampleMaster() {
+  return [
+    {no:1,customer:'SHINANN',partName:'MANIFOLD-COMP QA-QA',partCode:'F543QVAQA03',qrKey:'SHINANN_F543QVAQA03'},
+    {no:2,customer:'SHINANN',partName:'MANIFOLD-COMP NA-NE',partCode:'F543QAVNE01',qrKey:'SHINANN_F543QAVNE01'},
+    {no:3,customer:'SADC',partName:'MANIFOLD ASSY-SUC',partCode:'F543-QB7CB',qrKey:'SADC_F543-QB7CB'},
+  ];
+}
+
+function updateKPI() {
+  document.getElementById('k-total').textContent = MASTER.length;
+  const done = Object.keys(scanned).length;
+  document.getElementById('k-done').textContent = done;
+  document.getElementById('k-miss').textContent = Math.max(0, MASTER.length - done);
+}
+
+// ── QR 스캔 ───────────────────────────────────
+function startQR() {
+  html5QrCode = new Html5Qrcode("qr-reader");
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: { width: 240, height: 240 } },
+    onQRSuccess,
+    () => {}
+  ).catch(() => {
+    addLog('warn', '카메라 접근 불가 — 수동 입력을 사용해 주세요');
+  });
+}
+
+function stopQR() {
+  if (html5QrCode) {
+    html5QrCode.stop().catch(()=>{});
+    html5QrCode = null;
+  }
+}
+
+function onQRSuccess(decodedText) {
+  // 중복 비프음 방지
+  if (pendingQR === decodedText) return;
+  processScan(decodedText);
+}
+
+function manualScan() {
+  const val = document.getElementById('manual-input').value.trim();
+  if (!val) return;
+  processScan(val);
+  document.getElementById('manual-input').value = '';
+}
+
+// ── 스캔 처리 ─────────────────────────────────
+function processScan(qrKey) {
+  const el = document.getElementById('scan-status');
+  el.style.display = 'block';
+
+  // 마스터에서 찾기
+  const item = MASTER.find(m => m.qrKey === qrKey);
+
+  if (!item) {
+    // 오적재
+    el.className = 'scan-status err';
+    el.innerHTML = `<span class="status-icon">⚠</span>
+      <div class="status-part">오적재 감지!</div>
+      <div class="status-code">${qrKey}</div>
+      <div style="font-size:11px;margin-top:4px">선적 리스트에 없는 품목입니다</div>`;
+    addLog('err', `오적재: ${qrKey}`);
+    pendingQR = null;
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('detail-section').style.display = 'none';
+    vibrate([200,100,200]);
+    return;
+  }
+
+  if (scanned[qrKey]) {
+    // 중복 스캔
+    el.className = 'scan-status warn';
+    el.innerHTML = `<span class="status-icon">⚠</span>
+      <div class="status-part">이미 스캔한 품목</div>
+      <div class="status-code">${item.partCode}</div>
+      <div style="font-size:11px;margin-top:4px">${item.partName}</div>`;
+    addLog('warn', `중복: ${item.partName}`);
+    pendingQR = null;
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('detail-section').style.display = 'none';
+    vibrate([100]);
+    return;
+  }
+
+  // 정상 스캔
+  pendingQR = qrKey;
+  el.className = 'scan-status ok';
+  el.innerHTML = `<span class="status-icon">✅</span>
+    <div class="status-part">${item.partName}</div>
+    <div class="status-code">${item.partCode}  |  ${item.customer}</div>
+    <div style="font-size:11px;margin-top:4px">팔레트와 수량을 입력 후 저장 버튼을 누르세요</div>`;
+  document.getElementById('detail-section').style.display = 'grid';
+  document.getElementById('submit-btn').disabled = false;
+  vibrate([50]);
+}
+
+// ── 저장 ──────────────────────────────────────
+async function submitScan() {
+  if (!pendingQR) return;
+  const item   = MASTER.find(m => m.qrKey === pendingQR);
+  const pallet = document.getElementById('d-pallet').value;
+  const qty    = parseInt(document.getElementById('d-qty').value) || 1;
+
+  showLoading('저장 중...');
+
+  const payload = {
+    qrKey     : pendingQR,
+    customer  : item.customer,
+    partCode  : item.partCode,
+    partName  : item.partName,
+    boxQty    : qty,
+    pallet    : pallet,
+    scanBy    : CFG.name,
+    remark    : CFG.container ? `컨테이너: ${CFG.container}` : '',
+  };
+
+  try {
+    const res = await fetch(CFG.url, {
+      method  : 'POST',
+      body    : JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (data.status === 'ok') {
+      scanned[pendingQR] = true;
+      addLog('ok', `저장 완료: ${item.partName} (${qty}박스, ${pallet||'팔레트 미지정'})`);
+      updateKPI();
+      pendingQR = null;
+      document.getElementById('submit-btn').disabled = true;
+      document.getElementById('detail-section').style.display = 'none';
+      const el = document.getElementById('scan-status');
+      el.className = 'scan-status ok';
+      el.innerHTML = `<span class="status-icon">✅</span>
+        <div class="status-part">저장 완료!</div>
+        <div class="status-code">${item.partCode} — ${data.timestamp}</div>`;
+      vibrate([50,50,100]);
+    } else {
+      addLog('err', `저장 실패: ${data.msg}`);
+      alert(`저장 실패: ${data.msg}`);
+    }
+  } catch(e) {
+    // Apps Script 미연결 — 로컬에만 기록
+    scanned[pendingQR] = true;
+    addLog('ok', `[오프라인] ${item.partName} (${qty}박스) — Apps Script 미연결`);
+    updateKPI();
+    pendingQR = null;
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('detail-section').style.display = 'none';
+  }
+  hideLoading();
+}
+
+// ── 로그 ──────────────────────────────────────
+function addLog(type, msg) {
+  const ul = document.getElementById('log-list');
+  const now = new Date().toLocaleTimeString('ko-KR',{hour12:false,hour:'2-digit',minute:'2-digit'});
+  const dotClass = type==='ok'?'dot-ok':type==='err'?'dot-err':'dot-warn';
+  const li = document.createElement('li');
+  li.className = 'log-item';
+  li.innerHTML = `<div class="log-dot ${dotClass}"></div>
+    <span class="log-time">${now}</span>
+    <span class="log-desc">${msg}</span>`;
+  ul.insertBefore(li, ul.firstChild);
+  if (ul.children.length > 30) ul.removeChild(ul.lastChild);
+}
+
+// ── 유틸 ──────────────────────────────────────
+function showLoading(msg='처리 중...') {
+  document.getElementById('loading-text').textContent = msg;
+  document.getElementById('loading').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading').classList.remove('show');
+}
+function vibrate(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+// ── 초기화 ────────────────────────────────────
+window.onload = () => {
+  loadCfg();
+  if (!CFG.url) CFG.url = 'https://script.google.com/macros/s/AKfycbxDvomEWRs3JgdTxqBuzi5ggRQY6rzSxV1rXZR6c95Sa35eDN_xqgFGNdldDOIu5xm2pQ/exec';
+  if (CFG.url && CFG.name) {
+    document.getElementById('cfg-url').value  = CFG.url;
+    document.getElementById('cfg-name').value = CFG.name;
+    document.getElementById('cfg-container').value = CFG.container;
+  }
+};
+</script>
+</body>
+</html>
