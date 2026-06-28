@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>STC 적재 스캔 v4</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Segoe UI",Arial,sans-serif;background:#f4f5f7;color:#111827;min-height:100vh;}
+
+/* 시작 화면 */
+#start{max-width:400px;margin:0 auto;padding:40px 20px;}
+.logo{text-align:center;font-size:48px;margin-bottom:8px;}
+.app-title{text-align:center;font-size:20px;font-weight:700;color:#1E2D5A;margin-bottom:4px;}
+.app-sub{text-align:center;font-size:12px;color:#6B7280;margin-bottom:28px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;font-weight:600;color:#6B7280;margin-bottom:5px;text-transform:uppercase;}
+.field input{width:100%;padding:12px 14px;border:1.5px solid #E2E4E9;border-radius:10px;font-size:15px;background:#fff;}
+.field input:focus{outline:none;border-color:#1E2D5A;}
+.start-btn{width:100%;padding:14px;border-radius:12px;background:#1E2D5A;color:#fff;font-size:16px;font-weight:700;border:none;cursor:pointer;margin-top:8px;}
+.start-btn:disabled{background:#9CA3AF;cursor:not-allowed;}
+
+/* 메인 */
+#main{display:none;}
+.topbar{background:#1E2D5A;color:#fff;padding:11px 16px;display:flex;justify-content:space-between;align-items:center;}
+.tb-title{font-size:14px;font-weight:700;}
+.tb-sub{font-size:10px;color:#93a4c9;margin-top:2px;}
+.tb-clock{font-size:15px;font-weight:700;}
+
+/* 모드 탭 */
+.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:0;background:#fff;border-bottom:2px solid #E2E4E9;}
+.mode-tab{padding:10px;text-align:center;font-size:13px;font-weight:600;color:#6B7280;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;}
+.mode-tab.active.box-mode{color:#1D4ED8;border-bottom-color:#1D4ED8;background:#EFF6FF;}
+.mode-tab.active.plt-mode{color:#0F6E56;border-bottom-color:#0F6E56;background:#D1FAE5;}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#E2E4E9;}
+.kpi-box{background:#fff;padding:8px 4px;text-align:center;}
+.kpi-val{font-size:18px;font-weight:700;}
+.kpi-lbl{font-size:9px;color:#6B7280;margin-top:1px;}
+
+/* 카메라 */
+.cam-wrap{padding:10px 14px;}
+.sec-lbl{font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+#qr-reader{width:100%;border-radius:10px;overflow:hidden;border:2px solid #1E2D5A;background:#000;}
+
+/* 결과 카드 */
+.result{display:none;margin:8px 14px 0;border-radius:10px;padding:12px;border:2px solid;}
+.result.ok    {background:#fff;border-color:#0F6E56;}
+.result.err   {background:#FEE2E2;border-color:#FCA5A5;}
+.result.dup   {background:#FEF3C7;border-color:#FCD34D;}
+.result.pallet{background:#F0FDF9;border-color:#6EE7B7;}
+.r-name{font-size:14px;font-weight:700;color:#1E2D5A;margin-bottom:2px;}
+.r-sub{font-size:11px;color:#6B7280;margin-bottom:8px;}
+.r-msg{font-size:13px;font-weight:600;}
+.ok-txt{color:#0F6E56;}.err-txt{color:#B91C1C;}.warn-txt{color:#92400E;}
+
+/* 수량 표시 */
+.qty-badge{background:#1E2D5A;color:#fff;border-radius:8px;padding:8px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;}
+.qty-lbl{font-size:10px;color:#93a4c9;}
+.qty-num{font-size:22px;font-weight:700;}
+.qty-unit{font-size:11px;color:#93a4c9;}
+
+/* 진행 바 */
+.prog-bg{height:10px;background:#E5E7EB;border-radius:5px;overflow:hidden;margin:4px 0;}
+.prog-fill{height:100%;border-radius:5px;transition:width .4s;}
+.fill-prog{background:#1D4ED8;}.fill-done{background:#0F6E56;}
+
+/* 팔레트 결과 */
+.plt-result-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;}
+.plt-stat{background:#fff;border-radius:8px;border:1px solid #E2E4E9;padding:8px;text-align:center;}
+.plt-stat-num{font-size:20px;font-weight:700;color:#0F6E56;}
+.plt-stat-lbl{font-size:10px;color:#6B7280;}
+
+/* 팔레트 번호 선택 */
+.pallet-select-wrap{padding:8px 14px 0;}
+.pallet-select{width:100%;padding:10px 12px;border:1.5px solid #E2E4E9;border-radius:8px;font-size:14px;font-weight:700;color:#1E2D5A;background:#fff;}
+.pallet-select:focus{outline:none;border-color:#0F6E56;}
+.pallet-or{text-align:center;font-size:11px;color:#6B7280;margin:4px 0;}
+.pallet-input{width:100%;padding:10px 12px;border:1.5px solid #E2E4E9;border-radius:8px;font-size:14px;font-family:monospace;background:#fff;}
+.pallet-input:focus{outline:none;border-color:#0F6E56;}
+
+/* 저장 버튼 */
+.save-btn{width:calc(100% - 28px);margin:8px 14px 0;padding:12px;border-radius:10px;color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer;display:none;}
+.save-btn.box-save{background:#1D4ED8;}
+.save-btn.plt-save{background:#0F6E56;}
+.save-btn:disabled{background:#9CA3AF;cursor:not-allowed;}
+
+/* 팔레트 현황 */
+.plt-list-wrap{padding:8px 14px 80px;}
+.plt-item{background:#fff;border-radius:10px;border:1px solid #E2E4E9;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;}
+.plt-item.done{border-color:#6EE7B7;background:#F0FDF9;}
+.plt-no{font-size:13px;font-weight:700;color:#0F6E56;min-width:60px;}
+.plt-info{flex:1;}
+.plt-boxes{font-size:11px;color:#6B7280;}
+.plt-qty{font-size:13px;font-weight:700;color:#1E2D5A;text-align:right;}
+
+/* 품목 리스트 */
+.item-list-wrap{padding:8px 14px 80px;}
+.li{background:#fff;border-radius:10px;border:1px solid #E2E4E9;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;}
+.li.done{border-color:#6EE7B7;background:#F0FDF9;}
+.li.prog{border-color:#93C5FD;background:#EFF6FF;}
+.li-info{flex:1;min-width:0;}
+.li-name{font-size:12px;font-weight:700;color:#1E2D5A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.li-code{font-size:10px;font-family:monospace;color:#6B7280;}
+.li-right{text-align:right;flex-shrink:0;}
+.li-qty{font-size:13px;font-weight:700;}
+.li-status{font-size:10px;font-weight:600;}
+.mini-bar{height:4px;background:#E5E7EB;border-radius:2px;overflow:hidden;margin-top:4px;min-width:60px;}
+.mini-fill{height:100%;border-radius:2px;}
+
+/* 로딩 */
+.loading{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:10px;}
+.loading.show{display:flex;}
+.spinner{width:36px;height:36px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{color:#fff;font-size:13px;font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- 시작 화면 -->
+<div id="start">
+  <div class="logo">📦</div>
+  <div class="app-title">STC 적재 스캔</div>
+  <div class="app-sub">BOX + PALLET 2단계 스캔 시스템</div>
+  <div class="field">
+    <label>컨테이너 번호 *</label>
+    <input id="s-cont" placeholder="예) CN-2026-0627-A" oninput="chkStart()">
+  </div>
+  <div class="field">
+    <label>작업자 이름 *</label>
+    <input id="s-worker" placeholder="이름" oninput="chkStart()">
+  </div>
+  <button class="start-btn" id="start-btn" disabled onclick="goMain()">📷 스캔 시작</button>
+</div>
+
+<!-- 메인 화면 -->
+<div id="main">
+  <div class="topbar">
+    <div>
+      <div class="tb-title" id="t-cont">—</div>
+      <div class="tb-sub" id="t-worker">작업자: —</div>
+    </div>
+    <div class="tb-clock" id="clock"></div>
+  </div>
+
+  <!-- 모드 탭 -->
+  <div class="mode-tabs">
+    <div class="mode-tab box-mode active" id="tab-box" onclick="switchMode('box')">
+      📦 BOX 스캔
+    </div>
+    <div class="mode-tab plt-mode" id="tab-plt" onclick="switchMode('pallet')">
+      🏗️ PALLET 스캔
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi-row">
+    <div class="kpi-box"><div class="kpi-val" style="color:#1E2D5A" id="k-plan">0</div><div class="kpi-lbl">계획품목</div></div>
+    <div class="kpi-box"><div class="kpi-val" style="color:#0F6E56" id="k-done">0</div><div class="kpi-lbl">완료</div></div>
+    <div class="kpi-box"><div class="kpi-val" style="color:#B91C1C" id="k-miss">0</div><div class="kpi-lbl">미완료</div></div>
+    <div class="kpi-box"><div class="kpi-val" style="color:#0F6E56" id="k-plt">0</div><div class="kpi-lbl">팔레트</div></div>
+  </div>
+
+  <!-- 카메라 -->
+  <div class="cam-wrap">
+    <div class="sec-lbl" id="cam-lbl">📷 BOX QR 스캔</div>
+    <div id="qr-reader"></div>
+  </div>
+
+  <!-- 팔레트 번호 (BOX 모드) -->
+  <div class="pallet-select-wrap" id="pallet-input-wrap">
+    <div class="sec-lbl" style="margin-bottom:6px">🏗️ 팔레트 번호</div>
+    <select class="pallet-select" id="pallet-select">
+      <option value="">선택하세요</option>
+      <option>PLT-01</option><option>PLT-02</option><option>PLT-03</option>
+      <option>PLT-04</option><option>PLT-05</option><option>PLT-06</option>
+      <option>PLT-07</option><option>PLT-08</option><option>PLT-09</option>
+      <option>PLT-10</option>
+    </select>
+    <div class="pallet-or">또는 직접 입력</div>
+    <input class="pallet-input" id="pallet-manual" placeholder="예) PLT-11">
+  </div>
+
+  <!-- 결과 카드 -->
+  <div class="result" id="result"></div>
+
+  <!-- 저장 버튼 -->
+  <button class="save-btn box-save" id="save-btn" onclick="doSave()">✅ BOX 저장</button>
+
+  <!-- BOX 모드: 품목 리스트 -->
+  <div class="item-list-wrap" id="box-list-wrap">
+    <div class="sec-lbl" style="margin-bottom:8px">품목별 진행 현황</div>
+    <ul style="list-style:none" id="item-list"></ul>
+  </div>
+
+  <!-- PALLET 모드: 팔레트 현황 -->
+  <div class="plt-list-wrap" id="plt-list-wrap" style="display:none">
+    <div class="sec-lbl" style="margin-bottom:8px">팔레트 현황</div>
+    <div id="plt-list"></div>
+  </div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-txt" id="loading-txt">처리 중...</div>
+</div>
+
+<script>
+const URL = "https://script.google.com/macros/s/AKfycbyR0d7Xx84bsyeP3yvFmSy5fMyED_Oey6E0EGmwP7zKOuL81QXx96E4jH__dPuD7HVqGA/exec";
+
+let CFG     = { cont:"", worker:"", date:"" };
+let PLAN    = [];
+let PALLETS = []; // 완료된 팔레트 목록
+let scannedBoxes = new Set();
+let pending = null;
+let mode    = "box"; // "box" | "pallet"
+let scanner = null;
+let lastQR  = ""; let lastT = 0;
+
+// ── 시작 ──────────────────────────────────────
+function chkStart() {
+  const c = document.getElementById("s-cont").value.trim();
+  const w = document.getElementById("s-worker").value.trim();
+  document.getElementById("start-btn").disabled = !(c && w);
+}
+
+async function goMain() {
+  CFG.cont   = document.getElementById("s-cont").value.trim();
+  CFG.worker = document.getElementById("s-worker").value.trim();
+  CFG.date   = new Date().toISOString().slice(0,10);
+  document.getElementById("start").style.display = "none";
+  document.getElementById("main").style.display  = "block";
+  document.getElementById("t-cont").textContent   = CFG.cont;
+  document.getElementById("t-worker").textContent = "작업자: "+CFG.worker;
+  startClock();
+  await loadAll();
+  initCam();
+}
+
+function startClock() {
+  const el = document.getElementById("clock");
+  const t  = () => el.textContent = new Date().toLocaleTimeString("ko-KR",{hour12:false});
+  t(); setInterval(t,1000);
+}
+
+// ── 데이터 로드 ────────────────────────────────
+async function loadAll() {
+  showLoad("데이터 로딩 중...");
+  try {
+    // PLAN 로드
+    const r1   = await fetch(URL+"?action=getPlan&containerNo="+encodeURIComponent(CFG.cont)+"&date="+CFG.date);
+    const d1   = await r1.json();
+    if (d1.status==="ok") PLAN = d1.plan.map(p=>({...p, scannedEA:0}));
+
+    // SCAN_LOG 로드
+    const r2   = await fetch(URL+"?action=getScanLog&containerNo="+encodeURIComponent(CFG.cont)+"&date="+CFG.date);
+    const d2   = await r2.json();
+    if (d2.status==="ok") {
+      d2.logs.forEach(log => {
+        if (log.boxId) scannedBoxes.add(log.boxId+"|"+log.containerNo);
+        const item = PLAN.find(p=>p.qrKey===log.qrKey);
+        if (item) item.scannedEA += (Number(log.qty)||0);
+      });
+    }
+
+    // PALLET_LOG 로드
+    const r3   = await fetch(URL+"?action=getPalletLog&containerNo="+encodeURIComponent(CFG.cont)+"&date="+CFG.date);
+    const d3   = await r3.json();
+    if (d3.status==="ok") PALLETS = d3.logs;
+
+  } catch(e) { PLAN=[]; PALLETS=[]; }
+  hideLoad();
+  renderAll();
+}
+
+// ── 모드 전환 ──────────────────────────────────
+function switchMode(m) {
+  mode = m;
+  document.getElementById("tab-box").className = "mode-tab box-mode"+(m==="box"?" active":"");
+  document.getElementById("tab-plt").className = "mode-tab plt-mode"+(m==="pallet"?" active":"");
+  document.getElementById("cam-lbl").textContent = m==="box" ? "📦 BOX QR 스캔" : "🏗️ PALLET QR 스캔";
+  document.getElementById("pallet-input-wrap").style.display = m==="box" ? "block" : "none";
+  document.getElementById("box-list-wrap").style.display  = m==="box" ? "block" : "none";
+  document.getElementById("plt-list-wrap").style.display  = m==="pallet" ? "block" : "none";
+  document.getElementById("save-btn").style.display = "none";
+  document.getElementById("result").style.display   = "none";
+  pending = null;
+
+  const btn = document.getElementById("save-btn");
+  btn.className = m==="box" ? "save-btn box-save" : "save-btn plt-save";
+  btn.textContent = m==="box" ? "✅ BOX 저장" : "✅ PALLET 등록";
+}
+
+// ── 카메라 ────────────────────────────────────
+function initCam() {
+  scanner = new Html5Qrcode("qr-reader");
+  scanner.start(
+    {facingMode:"environment"},
+    {fps:12, qrbox:{width:220,height:220}},
+    onScan, ()=>{}
+  ).catch(()=>{
+    document.getElementById("qr-reader").innerHTML=
+      "<div style='padding:20px;text-align:center;color:#fff;font-size:13px'>카메라 접근 불가</div>";
+  });
+}
+
+function onScan(text) {
+  const now = Date.now();
+  if (text===lastQR && now-lastT<2500) return;
+  lastQR=text; lastT=now;
+  if (mode==="box") processBoxScan(text);
+  else processPalletScan(text);
+}
+
+// ── BOX 스캔 처리 ─────────────────────────────
+function processBoxScan(rawQR) {
+  pending = null;
+  const card = document.getElementById("result");
+  card.style.display = "block";
+  document.getElementById("save-btn").style.display = "none";
+
+  // QR 파싱: QR_KEY|수량|BOX001|PLT-01
+  const parts   = rawQR.split("|");
+  const qrKey   = parts[0].trim();
+  const qty     = parseInt(parts[1]) || 1;
+  const boxId   = parts[2] ? parts[2].trim() : null;
+  const pltInQR = parts[3] ? parts[3].trim() : null;
+
+  // PALLET QR 잘못 스캔
+  if (qrKey === "PALLET") {
+    card.className = "result err";
+    card.innerHTML = `<div class="r-name">❌ BOX 모드입니다</div>
+      <div class="r-msg err-txt">PALLET QR입니다. 탭을 전환하세요</div>`;
+    return;
+  }
+
+  // 중복 체크
+  if (boxId && scannedBoxes.has(boxId+"|"+CFG.cont)) {
+    card.className = "result dup";
+    card.innerHTML = `<div class="r-name">⚠ 중복 스캔</div>
+      <div class="r-sub">${boxId}</div>
+      <div class="r-msg warn-txt">이미 저장된 박스입니다</div>`;
+    vibrate([100]);
+    return;
+  }
+
+  // 품목 확인
+  const item = PLAN.find(p=>p.qrKey===qrKey);
+  if (!item && PLAN.length>0) {
+    card.className = "result err";
+    card.innerHTML = `<div class="r-name">❌ 오적재 감지!</div>
+      <div class="r-sub">${qrKey}</div>
+      <div class="r-msg err-txt">이 컨테이너 계획에 없는 품목</div>`;
+    vibrate([200,100,200]);
+    return;
+  }
+
+  // 팔레트 번호 자동 설정
+  if (pltInQR) {
+    document.getElementById("pallet-select").value = pltInQR;
+  }
+
+  const planItem  = item || {qrKey,partCode:qrKey,partName:qrKey,customer:"",planQty:null,scannedEA:0};
+  const planEA    = planItem.planQty || 0;
+  const nowEA     = planItem.scannedEA || 0;
+  const afterEA   = nowEA + qty;
+  const pct       = planEA ? Math.min(100,Math.round(afterEA/planEA*100)) : 0;
+  const isDone    = planEA && afterEA >= planEA;
+
+  pending = {...planItem, rawQR, boxId, qty, pltInQR};
+
+  card.className = "result ok";
+  card.innerHTML = `
+    <div class="r-name">${planItem.partName}</div>
+    <div class="r-sub">${planItem.partCode} | ${planItem.customer}${boxId?" | "+boxId:""}${pltInQR?" | "+pltInQR:""}</div>
+    <div class="qty-badge">
+      <div><div class="qty-lbl">이번 박스</div><div class="qty-num">${qty.toLocaleString()}</div></div>
+      <div style="text-align:right"><div class="qty-lbl">누적</div><div class="qty-unit">${afterEA.toLocaleString()}/${planEA?planEA.toLocaleString():"?"}EA</div></div>
+    </div>
+    <div class="prog-bg"><div class="prog-fill ${isDone?"fill-done":"fill-prog"}" style="width:${pct}%"></div></div>
+    <div class="r-msg ${isDone?"ok-txt":""}" style="text-align:center;margin-top:4px">
+      ${isDone?"✅ 완료!":"남은: "+(planEA-afterEA).toLocaleString()+"EA"}
+    </div>`;
+
+  document.getElementById("save-btn").style.display = "block";
+  document.getElementById("save-btn").disabled      = false;
+  vibrate([50]);
+}
+
+// ── PALLET 스캔 처리 ──────────────────────────
+function processPalletScan(rawQR) {
+  pending = null;
+  const card = document.getElementById("result");
+  card.style.display = "block";
+  document.getElementById("save-btn").style.display = "none";
+
+  // QR 파싱: PALLET|PLT-01|CN-2026-0627-A
+  const parts     = rawQR.split("|");
+  const isPallet  = parts[0].trim() === "PALLET";
+
+  if (!isPallet) {
+    card.className = "result err";
+    card.innerHTML = `<div class="r-name">❌ PALLET 모드입니다</div>
+      <div class="r-msg err-txt">BOX QR입니다. 탭을 전환하세요</div>`;
+    return;
+  }
+
+  const palletNo = parts[1] ? parts[1].trim() : "";
+  const contNo   = parts[2] ? parts[2].trim() : CFG.cont;
+
+  if (!palletNo) {
+    card.className = "result err";
+    card.innerHTML = `<div class="r-name">❌ 팔레트 번호 없음</div>
+      <div class="r-msg err-txt">QR 형식을 확인하세요</div>`;
+    return;
+  }
+
+  // 중복 체크
+  const already = PALLETS.find(p=>p.palletNo===palletNo);
+  if (already) {
+    card.className = "result dup";
+    card.innerHTML = `<div class="r-name">⚠ 이미 등록된 팔레트</div>
+      <div class="r-sub">${palletNo}</div>
+      <div class="r-msg warn-txt">박스 ${already.totalBox}개 / ${Number(already.totalQty).toLocaleString()}EA</div>`;
+    vibrate([100]);
+    return;
+  }
+
+  pending = { palletNo, contNo };
+
+  card.className = "result pallet";
+  card.innerHTML = `
+    <div class="r-name">🏗️ ${palletNo}</div>
+    <div class="r-sub">컨테이너: ${contNo}</div>
+    <div class="r-msg ok-txt">저장 버튼을 눌러 팔레트를 등록하세요</div>`;
+
+  document.getElementById("save-btn").style.display = "block";
+  document.getElementById("save-btn").disabled      = false;
+  vibrate([50]);
+}
+
+// ── 저장 ──────────────────────────────────────
+async function doSave() {
+  if (!pending) return;
+  document.getElementById("save-btn").disabled = true;
+
+  if (mode === "box") {
+    await saveBox();
+  } else {
+    await savePallet();
+  }
+}
+
+async function saveBox() {
+  const palletNo = document.getElementById("pallet-manual").value.trim() ||
+                   document.getElementById("pallet-select").value ||
+                   pending.pltInQR || "";
+
+  showLoad("BOX 저장 중...");
+  try {
+    const res  = await fetch(URL, {
+      method:"POST",
+      body: JSON.stringify({
+        action:"scanBox",
+        qrKey      : pending.qrKey,
+        containerNo: CFG.cont,
+        qty        : pending.qty,
+        scanBy     : CFG.worker,
+        boxId      : pending.boxId || "",
+        palletNo   : palletNo,
+      }),
+    });
+    const data = await res.json();
+    hideLoad();
+
+    if (data.status==="ok") {
+      if (pending.boxId) scannedBoxes.add(pending.boxId+"|"+CFG.cont);
+      const item = PLAN.find(p=>p.qrKey===pending.qrKey);
+      if (item) item.scannedEA = (item.scannedEA||0) + pending.qty;
+      renderAll();
+      document.getElementById("save-btn").style.display = "none";
+      vibrate(data.isDone?[50,50,100,50,100]:[50]);
+      pending = null;
+    } else {
+      alert("오류: "+data.msg);
+      document.getElementById("save-btn").disabled = false;
+      pending = null;
+    }
+  } catch(e) {
+    hideLoad();
+    if (pending.boxId) scannedBoxes.add(pending.boxId+"|"+CFG.cont);
+    const item = PLAN.find(p=>p.qrKey===pending.qrKey);
+    if (item) item.scannedEA = (item.scannedEA||0) + pending.qty;
+    renderAll();
+    document.getElementById("save-btn").style.display = "none";
+    pending = null;
+  }
+}
+
+async function savePallet() {
+  showLoad("PALLET 등록 중...");
+  try {
+    const res  = await fetch(URL, {
+      method:"POST",
+      body: JSON.stringify({
+        action     :"scanPallet",
+        palletNo   : pending.palletNo,
+        containerNo: CFG.cont,
+        scanBy     : CFG.worker,
+      }),
+    });
+    const data = await res.json();
+    hideLoad();
+
+    if (data.status==="ok") {
+      PALLETS.push({
+        palletNo  : data.palletNo,
+        totalBox  : data.totalBox,
+        totalQty  : data.totalQty,
+        status    : "완료",
+      });
+      renderAll();
+
+      const card = document.getElementById("result");
+      card.className = "result pallet";
+      card.innerHTML = `
+        <div class="r-name">✅ ${data.palletNo} 등록 완료</div>
+        <div class="plt-result-grid">
+          <div class="plt-stat"><div class="plt-stat-num">${data.totalBox}</div><div class="plt-stat-lbl">박스</div></div>
+          <div class="plt-stat"><div class="plt-stat-num">${Number(data.totalQty).toLocaleString()}</div><div class="plt-stat-lbl">총 EA</div></div>
+        </div>`;
+      document.getElementById("save-btn").style.display = "none";
+      vibrate([50,50,100]);
+      pending = null;
+    } else {
+      alert("오류: "+data.msg);
+      document.getElementById("save-btn").disabled = false;
+      pending = null;
+    }
+  } catch(e) {
+    hideLoad();
+    alert("연결 오류");
+    document.getElementById("save-btn").disabled = false;
+  }
+}
+
+// ── 렌더 ──────────────────────────────────────
+function renderAll() {
+  const total = PLAN.length;
+  const done  = PLAN.filter(p=>p.planQty&&(p.scannedEA||0)>=p.planQty).length;
+  document.getElementById("k-plan").textContent = total;
+  document.getElementById("k-done").textContent = done;
+  document.getElementById("k-miss").textContent = total-done;
+  document.getElementById("k-plt").textContent  = PALLETS.length;
+  renderItemList();
+  renderPltList();
+}
+
+function renderItemList() {
+  const ul = document.getElementById("item-list");
+  if (!PLAN.length) {
+    ul.innerHTML="<li style='text-align:center;color:#6B7280;font-size:12px;padding:16px'>계획 데이터 없음<br>2.PLAN 시트에 데이터를 입력하세요</li>";
+    return;
+  }
+  ul.innerHTML = PLAN.map(p=>{
+    const plan  = p.planQty||0;
+    const ea    = p.scannedEA||0;
+    const done  = plan&&ea>=plan;
+    const prog  = ea>0&&!done;
+    const pct   = plan?Math.min(100,Math.round(ea/plan*100)):0;
+    const qc    = done?"color:#0F6E56":prog?"color:#1D4ED8":"color:#B91C1C";
+    const sc    = done?"color:#0F6E56":prog?"color:#1D4ED8":"color:#B91C1C";
+    const st    = done?"✅완료":prog?ea.toLocaleString()+"/"+plan.toLocaleString():"미스캔";
+    const bc    = done?"fill-done":"fill-prog";
+    return `<li class="li ${done?"done":prog?"prog":""}">
+      <div class="li-info">
+        <div class="li-name">${p.partName}</div>
+        <div class="li-code">${p.partCode}</div>
+        <div class="mini-bar"><div class="mini-fill ${bc}" style="width:${pct}%"></div></div>
+      </div>
+      <div class="li-right">
+        <div class="li-qty" style="${qc}">${ea.toLocaleString()}<span style="font-size:9px;color:#6B7280">/${plan?plan.toLocaleString():"?"}</span></div>
+        <div class="li-status" style="${sc}">${st}</div>
+      </div>
+    </li>`;
+  }).join("");
+}
+
+function renderPltList() {
+  const wrap = document.getElementById("plt-list");
+  if (!PALLETS.length) {
+    wrap.innerHTML="<div style='text-align:center;color:#6B7280;font-size:12px;padding:16px'>등록된 팔레트 없음</div>";
+    return;
+  }
+  wrap.innerHTML = PALLETS.map(p=>`
+    <div class="plt-item done">
+      <div class="plt-no">🏗️ ${p.palletNo}</div>
+      <div class="plt-info">
+        <div class="plt-boxes">박스 ${p.totalBox}개</div>
+      </div>
+      <div class="plt-qty">${Number(p.totalQty).toLocaleString()} EA</div>
+    </div>`).join("");
+}
+
+function showLoad(msg="처리 중...") {
+  document.getElementById("loading-txt").textContent=msg;
+  document.getElementById("loading").classList.add("show");
+}
+function hideLoad() { document.getElementById("loading").classList.remove("show"); }
+function vibrate(p) { if(navigator.vibrate) navigator.vibrate(p); }
+</script>
+</body>
+</html>
