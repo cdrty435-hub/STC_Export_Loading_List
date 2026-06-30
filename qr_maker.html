@@ -92,6 +92,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gray);color:var(--
 .s-qty-unit{font-size:9px;color:rgba(255,255,255,.7);}
 .s-box-info{font-size:9px;color:rgba(255,255,255,.6);margin-top:2px;}
 .s-footer{font-size:8px;color:var(--muted);padding:3px 8px;border-top:1px solid #F3F4F6;display:flex;justify-content:space-between;}
+.sticker-cancel-btn{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;border:none;font-size:11px;line-height:18px;text-align:center;cursor:pointer;z-index:5;padding:0;}
+.sticker-cancel-btn:hover{background:var(--red);}
 
 @media print{
   body{background:#fff;}
@@ -100,6 +102,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gray);color:var(--
   .preview-header{display:none!important;}
   .sticker-grid{gap:3mm;}
   .sticker{border:0.5px solid #CBD5E1;}
+  .sticker-cancel-btn{display:none!important;}
   @page{size:A4;margin:8mm;}
 }
 </style>
@@ -135,6 +138,13 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gray);color:var(--
       </select>
     </div>
   </div>
+  <div class="field" style="margin-top:12px">
+    <label>구분 (스티커 종류)</label>
+    <div style="display:flex;gap:8px">
+      <button type="button" id="type-box-btn" class="type-btn type-sel" onclick="setQrType('BOX')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--navy);background:var(--navy);color:#fff;font-size:13px;font-weight:700;cursor:pointer">📦 BOX</button>
+      <button type="button" id="type-plt-btn" class="type-btn" onclick="setQrType('PALLET')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-size:13px;font-weight:700;cursor:pointer">🏗️ PALLET</button>
+    </div>
+  </div>
   <div class="size-row">
     <span class="size-lbl">QR 크기</span>
     <input class="size-slider" type="range" id="qr-size" min="60" max="200" value="110"
@@ -161,34 +171,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gray);color:var(--
 </div>
 
 <button class="gen-btn" id="gen-btn" disabled onclick="generate()">🏷️ BOX QR 스티커 생성</button>
-
-<!-- PALLET QR 생성 -->
-<div class="card" style="margin-top:0">
-  <div class="card-title">🏗️ PALLET QR 생성</div>
-
-  <!-- 품목별 팔레트 입력 -->
-  <div class="search-wrap" style="margin-bottom:10px">
-    <div class="add-row">
-      <input class="search-input" id="plt-search"
-        placeholder="품목 검색 또는 팔레트 번호 직접 입력  예) PLT-01"
-        oninput="searchPallet()" onkeydown="if(event.key==='Enter') addPalletItem()">
-      <button class="add-btn" onclick="addPalletItem()" style="background:var(--green)">＋ 추가</button>
-    </div>
-    <div class="drop" id="plt-drop"></div>
-  </div>
-
-  <div id="plt-item-list">
-    <div style="text-align:center;color:var(--muted);font-size:13px;padding:12px">
-      품목을 추가하면 팔레트별 수량을 입력할 수 있습니다
-    </div>
-  </div>
-
-  <button onclick="genPalletQR()" id="plt-gen-btn" disabled
-    style="width:100%;padding:12px;border-radius:10px;background:var(--green);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer;margin-top:10px">
-    🏗️ PALLET QR 생성
-  </button>
-  <div id="plt-preview" style="display:none;margin-top:14px"></div>
-</div>
 
 <!-- 재출력 패널 -->
 <div class="reprint-panel" id="reprint-panel">
@@ -225,6 +207,20 @@ let ITEMS    = [];
 let ALL_STICKERS = []; // 전체 스티커 목록 (재출력용)
 let qrCache  = {};
 let rpSelected = new Set();
+let QR_TYPE  = "BOX"; // "BOX" | "PALLET" — 동일 로직, 라벨/ID prefix만 다름
+
+function setQrType(type) {
+  QR_TYPE = type;
+  document.getElementById('type-box-btn').classList.toggle('type-sel', type==='BOX');
+  document.getElementById('type-plt-btn').classList.toggle('type-sel', type==='PALLET');
+  document.getElementById('type-box-btn').style.background = type==='BOX' ? 'var(--navy)' : '#fff';
+  document.getElementById('type-box-btn').style.color      = type==='BOX' ? '#fff' : 'var(--text)';
+  document.getElementById('type-box-btn').style.borderColor= type==='BOX' ? 'var(--navy)' : 'var(--border)';
+  document.getElementById('type-plt-btn').style.background = type==='PALLET' ? 'var(--green)' : '#fff';
+  document.getElementById('type-plt-btn').style.color      = type==='PALLET' ? '#fff' : 'var(--text)';
+  document.getElementById('type-plt-btn').style.borderColor= type==='PALLET' ? 'var(--green)' : 'var(--border)';
+  document.getElementById('gen-btn').textContent = type==='BOX' ? '🏷️ BOX QR 스티커 생성' : '🏷️ PALLET QR 스티커 생성';
+}
 
 // ── 초기화 ───────────────────────────────────
 window.onload = async () => {
@@ -236,8 +232,6 @@ window.onload = async () => {
   document.addEventListener('click', e => {
     if (!e.target.closest('.search-wrap')) {
       document.getElementById('master-drop').classList.remove('show');
-      const pltDrop = document.getElementById('plt-drop');
-      if (pltDrop) pltDrop.classList.remove('show');
     }
   });
 };
@@ -364,48 +358,55 @@ function makeQR(text, size) {
   });
 }
 
-// ── 스티커 데이터 생성 ───────────────────────
+// ── 스티커 데이터 생성 (BOX/PALLET 동일 로직) ──
 function buildStickers() {
   const container = document.getElementById('container').value.trim();
   const stickers  = [];
+  const prefix    = QR_TYPE === 'PALLET' ? 'P' : 'B';
 
   ITEMS.forEach((item, idx) => {
 
     const validBoxes = item.boxes.filter(b => b > 0);
     const totalQty   = validBoxes.reduce((s,v)=>s+v,0);
     validBoxes.forEach((qty, bi) => {
-      // ── 고유 BOX ID: 날짜+순번+랜덤 → 절대 중복 불가 ──
+      // ── 고유 ID: 종류prefix+날짜+순번+랜덤 → 절대 중복 불가 ──
       const ds    = new Date().toISOString().slice(2,10).replace(/-/g,"");
       const seq   = String(bi+1).padStart(3,"0");
       const rand  = Math.random().toString(36).slice(2,6).toUpperCase();
-      const boxId = `B${ds}${seq}${rand}`;
-      // ──────────────────────────────────────────────────
+      const boxId = `${prefix}${ds}${seq}${rand}`;
+      // ──────────────────────────────────────────────
 
-      // QR 인코딩: QR_KEY|수량|고유BOX_ID|팔레트번호
-      const qrData = palletNo
-        ? `${item.qrKey}|${qty}|${boxId}|${palletNo}`
-        : `${item.qrKey}|${qty}|${boxId}`;
+      // QR 인코딩: QR_KEY|수량|고유ID  (BOX/PALLET 형식 동일)
+      const qrData = `${item.qrKey}|${qty}|${boxId}`;
 
       stickers.push({
         ...item, qty, boxNo:bi+1, totalBox:validBoxes.length,
-        totalQty, boxId, qrData, container, palletNo,
+        totalQty, boxId, qrData, container, type:QR_TYPE,
       });
     });
   });
   return stickers;
 }
 
-// ── 스티커 HTML 생성 ─────────────────────────
-function stickerHTML(s, qrSize) {
-  const isShin  = s.customer.includes('SHINANN');
-  const hdrBg   = isShin ? '#1D4ED8' : s.customer ? '#92400E' : '#1E2D5A';
+// ── 스티커 HTML 생성 (BOX/PALLET 동일, 라벨만 변경) ──
+// idx가 주어지면(메인 미리보기) 취소(✕) 버튼 표시. 재출력 창에서는 idx 생략 → 버튼 없음.
+function stickerHTML(s, qrSize, idx) {
+  const isShin   = s.customer.includes('SHINANN');
+  const isPallet = s.type === 'PALLET';
+  // BOX/PALLET 모두 고객사 기준으로 색상 결정 (구분은 색이 아니라 헤더의 BOX/PALLET 텍스트와 ID 접두문자로)
+  const hdrBg    = isShin ? '#1D4ED8' : s.customer ? '#92400E' : '#1E2D5A';
+  const typeLbl  = isPallet ? 'PALLET' : 'BOX';
   const nameShort = s.partName.length>28 ? s.partName.slice(0,26)+'...' : s.partName;
   const company   = document.getElementById('company').value.trim() || 'STC Co., Ltd.';
+  const cancelBtn = (idx !== undefined)
+    ? `<button class="sticker-cancel-btn" onclick="cancelSticker(${idx})" title="이 스티커 취소">✕</button>`
+    : '';
 
   return `
-  <div class="sticker" data-qrdata="${s.qrData}">
+  <div class="sticker" data-qrdata="${s.qrData}" style="position:relative">
+    ${cancelBtn}
     <div class="s-hdr" style="background:${hdrBg}">
-      <span class="s-hdr-left">${s.customer||'STC'} &nbsp; ${s.boxId} (${s.boxNo}/${s.totalBox})</span>
+      <span class="s-hdr-left">${isPallet?'🏗️':'📦'} ${s.customer||'STC'} &nbsp; ${s.boxId} (${s.boxNo}/${s.totalBox})</span>
       <span class="s-hdr-right">${s.container||''}</span>
     </div>
     <div class="s-body">
@@ -416,11 +417,11 @@ function stickerHTML(s, qrSize) {
         <div class="s-name">${nameShort}</div>
         <div class="s-code">${s.partCode}</div>
         <div class="s-key">${s.qrData}</div>
-        <div class="s-qty-badge">
+        <div class="s-qty-badge" style="background:${hdrBg}">
           <span class="s-qty-label">수량 / QTY</span>
           <span class="s-qty-num">${s.qty.toLocaleString()}</span>
           <span class="s-qty-unit">EA &nbsp; (총 ${s.totalQty.toLocaleString()}EA)</span>
-          <div class="s-box-info">BOX ${s.boxNo} / ${s.totalBox}</div>
+          <div class="s-box-info">${typeLbl} ${s.boxNo} / ${s.totalBox}</div>
         </div>
       </div>
     </div>
@@ -451,10 +452,10 @@ async function generate() {
     }
   }
 
-  // 스티커 렌더
+  // 스티커 렌더 (idx 전달 → 취소 버튼 표시)
   const grid = document.getElementById('sticker-grid');
   grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-  grid.innerHTML = ALL_STICKERS.map(s => stickerHTML(s, qrSize)).join('');
+  grid.innerHTML = ALL_STICKERS.map((s,i) => stickerHTML(s, qrSize, i)).join('');
 
   // 재출력 버튼 생성
   renderReprintPanel();
@@ -462,7 +463,42 @@ async function generate() {
   document.getElementById('preview-card').style.display = 'block';
   document.getElementById('reprint-panel').style.display = 'block';
   document.getElementById('preview-card').scrollIntoView({behavior:'smooth'});
-  btn.disabled = false; btn.textContent = '🏷️ QR 스티커 생성';
+  btn.disabled = false; btn.textContent = QR_TYPE==='BOX' ? '🏷️ BOX QR 스티커 생성' : '🏷️ PALLET QR 스티커 생성';
+}
+
+// ── 개별 스티커 취소 (생성 후 잘못된 1장만 제거) ──
+function cancelSticker(idx) {
+  const s = ALL_STICKERS[idx];
+  if (!s) return;
+  if (!confirm(`이 스티커를 취소하시겠습니까?\n${s.boxId} (${s.qty.toLocaleString()}EA)`)) return;
+
+  ALL_STICKERS.splice(idx, 1);
+
+  const qrSize = parseInt(document.getElementById('qr-size').value);
+  const cols   = parseInt(document.getElementById('cols').value);
+
+  document.getElementById('total-stickers').textContent = ALL_STICKERS.length;
+  const grid = document.getElementById('sticker-grid');
+  grid.innerHTML = ALL_STICKERS.map((s2,i) => stickerHTML(s2, qrSize, i)).join('');
+  renderReprintPanel();
+
+  if (!ALL_STICKERS.length) {
+    document.getElementById('preview-card').style.display = 'none';
+    document.getElementById('reprint-panel').style.display = 'none';
+  }
+}
+
+// ── 초기화 (BOX/PALLET 공통) ──────────────────
+function resetBoxQR() {
+  if (!confirm('스티커 목록을 초기화하시겠습니까?')) return;
+  ITEMS = [];
+  ALL_STICKERS = [];
+  qrCache = {};
+  rpSelected.clear();
+  document.getElementById('preview-card').style.display = 'none';
+  document.getElementById('reprint-panel').style.display = 'none';
+  document.getElementById('sticker-grid').innerHTML = '';
+  renderItems();
 }
 
 // ── 재출력 패널 ──────────────────────────────
@@ -512,277 +548,6 @@ async function reprintSelected() {
   win.document.close();
 }
 
-// ── PALLET 품목 관리 ────────────────────────────
-let PLT_ITEMS = []; // [{ pltNo, partName, partCode, qrKey, customer, copies }]
-
-function searchPallet() {
-  const q    = document.getElementById("plt-search").value.trim().toLowerCase();
-  const drop = document.getElementById("plt-drop");
-  if (!q) { drop.classList.remove("show"); return; }
-
-  // 마스터에서 검색
-  const res = MASTER.filter(m =>
-    m.qrKey.toLowerCase().includes(q) ||
-    m.partCode.toLowerCase().includes(q) ||
-    m.partName.toLowerCase().includes(q)
-  ).slice(0,10);
-
-  if (!res.length) { drop.classList.remove("show"); return; }
-  drop.innerHTML = res.map(m => `
-    <div class="drop-item" onclick="selectPalletItem('${m.qrKey}','${m.partName}','${m.partCode}','${m.customer}')">
-      <div style="font-weight:600">${m.partName}</div>
-      <div style="font-family:monospace;font-size:11px;color:var(--muted)">${m.partCode} | ${m.customer}</div>
-    </div>`).join("");
-  drop.classList.add("show");
-}
-
-function selectPalletItem(qrKey, partName, partCode, customer) {
-  document.getElementById("plt-search").value = partName;
-  document.getElementById("plt-drop").classList.remove("show");
-  addPalletItem(qrKey, partName, partCode, customer);
-}
-
-function addPalletItem(qrKey, partName, partCode, customer) {
-  const input = document.getElementById("plt-search").value.trim();
-  if (!input) return;
-
-  // 직접 팔레트 번호 입력한 경우 (PLT- 형식)
-  if (!qrKey) {
-    if (PLT_ITEMS.find(i => i.pltNo === input)) { alert("이미 추가된 팔레트 번호입니다."); return; }
-    PLT_ITEMS.push({ pltNo:input, partName:"", partCode:"", qrKey:"", customer:"", copies:1, pltBoxes:[0], startNo:1 });
-  } else {
-    const nextNo = "PLT-" + String(PLT_ITEMS.length + 1).padStart(2,"0");
-    PLT_ITEMS.push({ pltNo:nextNo, partName, partCode, qrKey, customer, copies:1, pltBoxes:[0], startNo:1 });
-  }
-
-  document.getElementById("plt-search").value = "";
-  document.getElementById("plt-drop").classList.remove("show");
-  renderPltItems();
-}
-
-function delPltItem(idx) {
-  PLT_ITEMS.splice(idx,1);
-  // 번호 재정렬
-  PLT_ITEMS.forEach((item,i) => {
-    if (item.pltNo.startsWith("PLT-")) {
-      item.pltNo = "PLT-" + String(i+1).padStart(2,"0");
-    }
-  });
-  renderPltItems();
-}
-
-function updatePltNo(idx, val) { PLT_ITEMS[idx].pltNo = val; }
-function updatePltCopies(idx, val) { PLT_ITEMS[idx].copies = parseInt(val)||1; }
-
-function autoSplitPlt(idx) {
-  const total  = parseInt(document.getElementById(`plt-at-${idx}`).value) || 0;
-  const perPlt = parseInt(document.getElementById(`plt-ap-${idx}`).value) || 0;
-  const startN = parseInt(document.getElementById(`plt-sn-${idx}`).value) || 1;
-  if (!total || !perPlt) return;
-
-  const item = PLT_ITEMS[idx];
-  item.totalQty = total;
-  item.perPlt   = perPlt;
-  item.startNo  = startN;
-
-  // 분할 계산
-  const boxes = [];
-  let rem = total;
-  while (rem > 0) { boxes.push(Math.min(rem, perPlt)); rem -= perPlt; }
-  item.pltBoxes = boxes;
-  renderPltItems();
-}
-
-function renderPltItems() {
-  const wrap = document.getElementById("plt-item-list");
-  const btn  = document.getElementById("plt-gen-btn");
-
-  if (!PLT_ITEMS.length) {
-    wrap.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:12px">품목을 추가하면 팔레트별 수량을 입력할 수 있습니다</div>';
-    btn.disabled = true;
-    return;
-  }
-
-  wrap.innerHTML = PLT_ITEMS.map((item,idx) => {
-    const boxes = item.pltBoxes || [item.totalQty||0];
-    const totalQty = boxes.reduce((s,v)=>s+v,0);
-    const boxInputs = boxes.map((b,bi) => `
-      <div class="box-input-wrap">
-        <span class="box-no">${idx===0?bi+1:bi+1}</span>
-        <input class="box-input" type="number" value="${b}" min="0"
-          onchange="PLT_ITEMS[${idx}].pltBoxes[${bi}]=parseInt(this.value)||0;updatePltSum(${idx})"
-          oninput="PLT_ITEMS[${idx}].pltBoxes[${bi}]=parseInt(this.value)||0;updatePltSum(${idx})">
-        <button class="box-del" onclick="PLT_ITEMS[${idx}].pltBoxes.splice(${bi},1);renderPltItems()">✕</button>
-      </div>`).join("");
-
-    return `
-    <div style="background:var(--gray);border-radius:10px;border:1px solid var(--border);padding:14px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-        <div>
-          ${item.partName ? `<div style="font-size:13px;font-weight:700;color:var(--green)">${item.partName}</div>` : ""}
-          ${item.partCode ? `<div style="font-size:11px;font-family:monospace;color:var(--muted)">${item.partCode} | ${item.customer}</div>` : ""}
-          ${!item.partName ? `<div style="font-size:13px;font-weight:700;color:var(--navy)">${item.pltNo}</div>` : ""}
-        </div>
-        <button class="item-del" onclick="delPltItem(${idx})">✕ 삭제</button>
-      </div>
-
-      <!-- 자동 분할 -->
-      <div class="qty-auto-row" style="margin-bottom:10px">
-        <div class="field"><label>총 수량 (EA)</label><input id="plt-at-${idx}" type="number" placeholder="예) 5000" value="${item.totalQty||""}" style="font-weight:700"></div>
-        <div class="field"><label>팔레트당 수량</label><input id="plt-ap-${idx}" type="number" placeholder="예) 2500" value="${item.perPlt||""}" style="font-weight:700"></div>
-        <div class="field"><label>팔레트 시작번호</label><input id="plt-sn-${idx}" type="number" value="${item.startNo||1}" min="1" style="font-weight:700" oninput="PLT_ITEMS[${idx}].startNo=parseInt(this.value)||1"></div>
-        <button class="auto-btn" onclick="autoSplitPlt(${idx})">자동 분할</button>
-      </div>
-
-      <!-- 팔레트별 수량 -->
-      <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px">팔레트별 수량 (EA)</div>
-      <div class="boxes-wrap" id="plt-boxes-${idx}">
-        ${boxInputs}
-        <button class="add-box-btn" onclick="PLT_ITEMS[${idx}].pltBoxes.push(0);renderPltItems()">＋ 팔레트 추가</button>
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px" id="plt-sum-${idx}">
-        팔레트 <b>${boxes.length}개</b> &nbsp;|&nbsp; 총 수량 <b>${totalQty.toLocaleString()}EA</b>
-      </div>
-
-      <!-- 출력 장수 -->
-      <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
-        <span style="font-size:11px;font-weight:600;color:var(--muted)">팔레트당 출력 장수</span>
-        <button class="qb" onclick="PLT_ITEMS[${idx}].copies=Math.max(1,PLT_ITEMS[${idx}].copies-1);renderPltItems()">−</button>
-        <span style="font-size:15px;font-weight:700;color:var(--navy);min-width:24px;text-align:center">${item.copies}</span>
-        <button class="qb" onclick="PLT_ITEMS[${idx}].copies=Math.min(10,PLT_ITEMS[${idx}].copies+1);renderPltItems()">＋</button>
-        <span style="font-size:11px;color:var(--muted)">장</span>
-      </div>
-    </div>`;
-  }).join("");
-  btn.disabled = false;
-}
-
-function updatePltSum(idx) {
-  const boxes = PLT_ITEMS[idx].pltBoxes || [];
-  const total = boxes.reduce((s,v)=>s+v,0);
-  const el = document.getElementById(`plt-sum-${idx}`);
-  if (el) el.innerHTML = `팔레트 <b>${boxes.length}개</b> &nbsp;|&nbsp; 총 수량 <b>${total.toLocaleString()}EA</b>`;
-}
-
-// ── PALLET QR 생성 ─────────────────────────────
-async function genPalletQR() {
-  if (!PLT_ITEMS.length) { alert("팔레트를 추가하세요."); return; }
-
-  const contNo  = document.getElementById("container").value.trim() || "";
-  const qrSize  = parseInt(document.getElementById("qr-size").value);
-  const cols    = parseInt(document.getElementById("cols").value);
-  const company = document.getElementById("company").value.trim() || "STC Co., Ltd.";
-
-  const wrap = document.getElementById("plt-preview");
-  wrap.style.display = "block";
-  wrap.innerHTML = "<div style='text-align:center;color:var(--muted);padding:16px'>생성 중...</div>";
-
-  // 팔레트별 스티커 목록 생성 (전체 순번 — PLT-01, PLT-02, PLT-03...)
-  const pltStickers = [];
-  let globalNo = 1; // 전체 팔레트 순번 (품목 관계없이 연속)
-  for (const item of PLT_ITEMS) {
-    const boxes    = (item.pltBoxes || [0]).filter(b => b > 0);
-    const totalQty = boxes.reduce((s,v)=>s+v, 0);
-    boxes.forEach((qty) => {
-      const pltNo = `PLT-${String(globalNo).padStart(2,"0")}`;
-      pltStickers.push({ pltNo, partName:item.partName, partCode:item.partCode,
-        qrKey:item.qrKey, customer:item.customer,
-        pltQty:qty, totalQty, copies:item.copies });
-      globalNo++;
-    });
-  }
-
-  // PALLET QR - 고유UID만 (팔레트 번호 없음)
-  const qrImgs = [];
-  for (let si = 0; si < pltStickers.length; si++) {
-    const s    = pltStickers[si];
-    const ds   = new Date().toISOString().slice(2,10).replace(/-/g,"");
-    const seq  = String(si+1).padStart(3,"0");
-    const rand = Math.random().toString(36).slice(2,6).toUpperCase();
-    const uid  = `B${ds}${seq}${rand}`;
-    // 형식: PALLET|고유UID  (팔레트 번호 없음)
-    const qrData = `PALLET|${uid}`;
-    const img = await makeQR(qrData, qrSize);
-    qrImgs.push({ img, qrData, uid });
-  }
-
-  // 스티커 생성
-  let allStickers = "";
-  let totalSheets = 0;
-  for (let si = 0; si < pltStickers.length; si++) {
-    const s = pltStickers[si];
-    const { img, qrData } = qrImgs[si];
-    for (let cp = 0; cp < s.copies; cp++) {
-      totalSheets++;
-      // 전체 팔레트 중 몇 번째인지
-      const pltSeq = si + 1;
-      const pltTotal = pltStickers.length;
-      allStickers += `
-        <div class="sticker" style="break-inside:avoid">
-          <div class="s-hdr" style="background:#0F6E56">
-            <span class="s-hdr-left">PALLET &nbsp; ${qrImgs[si].uid}</span>
-            <span class="s-hdr-right">${pltSeq}/${pltTotal}</span>
-          </div>
-          <div class="s-body">
-            <div class="s-qr">
-              <img src="${img}" width="${qrSize}" height="${qrSize}" style="display:block;image-rendering:pixelated">
-            </div>
-            <div class="s-info">
-              <div class="s-name">${s.partName||s.pltNo}</div>
-              <div class="s-code">${s.partCode||""}</div>
-              <div class="s-key">${qrData}</div>
-              <div class="s-qty-badge" style="background:#0F6E56;margin-top:4px">
-                <span class="s-qty-label">팔레트 수량 / PALLET QTY</span>
-                <span class="s-qty-num">${s.pltQty.toLocaleString()}</span>
-                <span class="s-qty-unit">EA &nbsp;(총 ${s.totalQty.toLocaleString()}EA)</span>
-                <div class="s-box-info">PLT ${pltSeq} / ${pltTotal}</div>
-              </div>
-            </div>
-          </div>
-          <div class="s-footer">
-            <span>${company}</span>
-            <span>${new Date().toLocaleDateString("ko-KR")}</span>
-          </div>
-        </div>`;
-    }
-  }
-
-  wrap.innerHTML = `
-    <div style="margin-bottom:8px;font-size:12px;color:var(--muted)">
-      총 ${pltStickers.length}팔레트 / ${totalSheets}장 생성
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-bottom:12px">
-      ${allStickers}
-    </div>
-    <div style="display:flex;gap:8px">
-      <button onclick="printPalletQR()" style="padding:10px 24px;border-radius:8px;background:#1E2D5A;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer">
-        🖨️ 인쇄
-      </button>
-      <button onclick="resetPalletQR()" style="padding:10px 24px;border-radius:8px;background:var(--redL);color:var(--red);border:1.5px solid #FCA5A5;font-size:13px;font-weight:600;cursor:pointer">
-        🗑️ 초기화
-      </button>
-    </div>`;
-}
-
-function resetPalletQR() {
-  if (!confirm("PALLET QR 목록을 초기화하시겠습니까?")) return;
-  PLT_ITEMS = [];
-  document.getElementById("plt-preview").style.display = "none";
-  document.getElementById("plt-preview").innerHTML = "";
-  renderPltItems();
-}
-
-function printPalletQR() {
-  const content = document.getElementById("plt-preview").innerHTML;
-  const win = window.open("","_blank");
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <style>*{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:"Segoe UI",Arial,sans-serif;}
-    ${document.querySelector("style").textContent}
-    @page{size:A4;margin:8mm;}</style></head>
-    <body>${content}<script>window.onload=()=>window.print()<\/script></body></html>`);
-  win.document.close();
-}
 </script>
 </body>
 </html>
