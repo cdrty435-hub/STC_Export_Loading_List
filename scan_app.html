@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>STC 적재 스캔</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Segoe UI",Arial,sans-serif;background:#f4f5f7;color:#111827;min-height:100vh;}
+
+/* 시작 화면 */
+#start{max-width:400px;margin:0 auto;padding:40px 20px;}
+.logo{text-align:center;font-size:48px;margin-bottom:8px;}
+.app-title{text-align:center;font-size:20px;font-weight:700;color:#1E2D5A;margin-bottom:4px;}
+.app-sub{text-align:center;font-size:12px;color:#6B7280;margin-bottom:28px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;font-weight:600;color:#6B7280;margin-bottom:5px;text-transform:uppercase;}
+.field input{width:100%;padding:12px 14px;border:1.5px solid #E2E4E9;border-radius:10px;font-size:15px;background:#fff;}
+.field input:focus{outline:none;border-color:#1E2D5A;}
+.start-btn{width:100%;padding:14px;border-radius:12px;background:#1E2D5A;color:#fff;font-size:16px;font-weight:700;border:none;cursor:pointer;margin-top:8px;}
+.start-btn:disabled{background:#9CA3AF;cursor:not-allowed;}
+
+/* 메인 */
+#main{display:none;}
+.topbar{background:#1E2D5A;color:#fff;padding:11px 16px;display:flex;justify-content:space-between;align-items:center;}
+.tb-title{font-size:14px;font-weight:700;}
+.tb-sub{font-size:10px;color:#93a4c9;margin-top:2px;}
+.tb-clock{font-size:15px;font-weight:700;}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#E2E4E9;}
+.kpi-box{background:#fff;padding:10px 4px;text-align:center;}
+.kpi-val{font-size:20px;font-weight:700;}
+.kpi-lbl{font-size:10px;color:#6B7280;margin-top:1px;}
+
+/* 카메라 */
+.cam-wrap{padding:10px 14px;}
+.sec-lbl{font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+#qr-reader{width:100%;border-radius:10px;overflow:hidden;border:2px solid #1E2D5A;background:#000;}
+
+/* 결과 카드 */
+.result{display:none;margin:8px 14px 0;border-radius:10px;padding:12px;border:2px solid;}
+.result.ok    {background:#fff;border-color:#0F6E56;}
+.result.err   {background:#FEE2E2;border-color:#FCA5A5;}
+.result.dup   {background:#FEF3C7;border-color:#FCD34D;}
+.r-name{font-size:14px;font-weight:700;color:#1E2D5A;margin-bottom:2px;}
+.r-sub{font-size:11px;color:#6B7280;margin-bottom:8px;}
+.r-msg{font-size:13px;font-weight:600;}
+.ok-txt{color:#0F6E56;}.err-txt{color:#B91C1C;}.warn-txt{color:#92400E;}
+
+/* 수량 표시 */
+.qty-badge{background:#1E2D5A;color:#fff;border-radius:8px;padding:8px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;}
+.qty-lbl{font-size:10px;color:#93a4c9;}
+.qty-num{font-size:22px;font-weight:700;}
+.qty-unit{font-size:11px;color:#93a4c9;}
+
+/* 진행 바 */
+.prog-bg{height:10px;background:#E5E7EB;border-radius:5px;overflow:hidden;margin:4px 0;}
+.prog-fill{height:100%;border-radius:5px;transition:width .4s;}
+.fill-prog{background:#1D4ED8;}.fill-done{background:#0F6E56;}
+
+/* 저장 버튼 */
+.save-btn{width:calc(100% - 28px);margin:8px 14px 0;padding:12px;border-radius:10px;color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer;display:none;background:#1D4ED8;}
+.save-btn:disabled{background:#9CA3AF;cursor:not-allowed;}
+
+/* 품목 리스트 */
+.item-list-wrap{padding:8px 14px 80px;}
+.li{background:#fff;border-radius:10px;border:1px solid #E2E4E9;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;}
+.li.done{border-color:#6EE7B7;background:#F0FDF9;}
+.li.prog{border-color:#93C5FD;background:#EFF6FF;}
+.li-info{flex:1;min-width:0;}
+.li-name{font-size:12px;font-weight:700;color:#1E2D5A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.li-code{font-size:10px;font-family:monospace;color:#6B7280;}
+.li-right{text-align:right;flex-shrink:0;}
+.li-qty{font-size:13px;font-weight:700;}
+.li-status{font-size:10px;font-weight:600;}
+.mini-bar{height:4px;background:#E5E7EB;border-radius:2px;overflow:hidden;margin-top:4px;min-width:60px;}
+.mini-fill{height:100%;border-radius:2px;}
+
+/* 로딩 */
+.loading{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:10px;}
+.loading.show{display:flex;}
+.spinner{width:36px;height:36px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{color:#fff;font-size:13px;font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- 시작 화면 -->
+<div id="start">
+  <div class="logo">📦</div>
+  <div class="app-title">STC 적재 스캔</div>
+  <div class="app-sub">BOX / PALLET QR 스캔 시스템</div>
+  <div class="field">
+    <label>스캔 모드 *</label>
+    <div style="display:flex;gap:8px">
+      <button type="button" id="mode-box-btn" onclick="setScanMode('BOX')" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid #1E2D5A;background:#1E2D5A;color:#fff;font-size:14px;font-weight:700;cursor:pointer">📦 BOX</button>
+      <button type="button" id="mode-plt-btn" onclick="setScanMode('PALLET')" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid #E2E4E9;background:#fff;color:#111827;font-size:14px;font-weight:700;cursor:pointer">🏗️ PALLET</button>
+    </div>
+  </div>
+  <div class="field">
+    <label>작업 날짜 *</label>
+    <input type="date" id="s-date">
+  </div>
+  <div class="field">
+    <label>컨테이너 번호 <span style="color:#9CA3AF;font-size:10px">(선택 — 나중에 배정 가능)</span></label>
+    <input id="s-cont" placeholder="없으면 비워두세요" oninput="chkStart()">
+  </div>
+  <div class="field">
+    <label>작업자 이름 *</label>
+    <input id="s-worker" placeholder="이름" oninput="chkStart()">
+  </div>
+  <button class="start-btn" id="start-btn" disabled onclick="goMain()">📷 스캔 시작</button>
+</div>
+
+<!-- 메인 화면 -->
+<div id="main">
+  <div class="topbar">
+    <div>
+      <div class="tb-title" id="t-cont">—</div>
+      <div class="tb-sub" id="t-worker">작업자: —</div>
+    </div>
+    <button id="tb-mode-btn" onclick="toggleMainMode()" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">📦 BOX</button>
+    <div class="tb-clock" id="clock"></div>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi-row">
+    <div class="kpi-box"><div class="kpi-val" style="color:#1E2D5A" id="k-plan">0</div><div class="kpi-lbl">계획품목</div></div>
+    <div class="kpi-box"><div class="kpi-val" style="color:#0F6E56" id="k-done">0</div><div class="kpi-lbl">완료</div></div>
+    <div class="kpi-box"><div class="kpi-val" style="color:#B91C1C" id="k-miss">0</div><div class="kpi-lbl">미완료</div></div>
+  </div>
+
+  <!-- 카메라 -->
+  <div class="cam-wrap">
+    <div class="sec-lbl">📷 QR 스캔 (BOX/PALLET 자동 인식)</div>
+    <div id="qr-reader"></div>
+  </div>
+
+  <!-- 결과 카드 -->
+  <div class="result" id="result"></div>
+
+  <!-- 저장 버튼 -->
+  <button class="save-btn" id="save-btn" onclick="doSave()">✅ 저장</button>
+
+  <!-- 품목 리스트 -->
+  <div class="item-list-wrap" id="box-list-wrap">
+    <div class="sec-lbl" style="margin-bottom:8px">품목별 진행 현황</div>
+    <ul style="list-style:none" id="item-list"></ul>
+  </div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-txt" id="loading-txt">처리 중...</div>
+</div>
+
+<script>
+const URL = "https://script.google.com/macros/s/AKfycbyR0d7Xx84bsyeP3yvFmSy5fMyED_Oey6E0EGmwP7zKOuL81QXx96E4jH__dPuD7HVqGA/exec";
+
+let CFG     = { cont:"", worker:"", date:"", mode:"BOX" };
+let PLAN    = [];
+let scannedBoxes = new Set();
+let pending = null;
+let scanner = null;
+let lastQR  = ""; let lastT = 0;
+
+// 기기 로컬 날짜(YYYY-MM-DD) — toISOString()은 UTC라 자정 전후 날짜가 어긋날 수 있어 사용 금지
+function localDateStr(d) {
+  d = d || new Date();
+  const y  = d.getFullYear();
+  const m  = String(d.getMonth()+1).padStart(2,"0");
+  const dd = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${dd}`;
+}
+
+// ── 시작 ──────────────────────────────────────
+function setScanMode(mode) {
+  CFG.mode = mode;
+  document.getElementById('mode-box-btn').style.background = mode==='BOX' ? '#1E2D5A' : '#fff';
+  document.getElementById('mode-box-btn').style.color      = mode==='BOX' ? '#fff' : '#111827';
+  document.getElementById('mode-box-btn').style.borderColor= mode==='BOX' ? '#1E2D5A' : '#E2E4E9';
+  document.getElementById('mode-plt-btn').style.background = mode==='PALLET' ? '#0F6E56' : '#fff';
+  document.getElementById('mode-plt-btn').style.color      = mode==='PALLET' ? '#fff' : '#111827';
+  document.getElementById('mode-plt-btn').style.borderColor= mode==='PALLET' ? '#0F6E56' : '#E2E4E9';
+}
+
+function chkStart() {
+  const w = document.getElementById("s-worker").value.trim();
+  document.getElementById("start-btn").disabled = !w;
+}
+
+// 날짜 필드 기본값 = 오늘 (기기 로컬 기준)
+document.getElementById("s-date").value = localDateStr();
+
+async function goMain() {
+  CFG.cont   = document.getElementById("s-cont").value.trim() || "TBD";
+  CFG.worker = document.getElementById("s-worker").value.trim();
+  CFG.date   = document.getElementById("s-date").value || localDateStr();
+  document.getElementById("start").style.display = "none";
+  document.getElementById("main").style.display  = "block";
+  document.getElementById("t-cont").textContent  = (CFG.cont === "TBD" ? "⏳ 컨테이너 미정" : CFG.cont) + "  ·  " + CFG.date;
+  updateModeUI();
+  startClock();
+  await loadAll();
+  initCam();
+}
+
+function updateModeUI() {
+  document.getElementById("t-worker").textContent = "작업자: "+CFG.worker;
+  document.getElementById("tb-mode-btn").textContent = CFG.mode==='PALLET' ? "🏗️ PALLET" : "📦 BOX";
+  document.getElementById("save-btn").textContent    = CFG.mode==='PALLET' ? "✅ PALLET 저장" : "✅ BOX 저장";
+}
+
+function toggleMainMode() {
+  CFG.mode = CFG.mode === 'BOX' ? 'PALLET' : 'BOX';
+  updateModeUI();
+  document.getElementById("result").style.display = "none";
+  document.getElementById("save-btn").style.display = "none";
+  pending = null;
+  if (PLAN.length) renderAll();
+}
+
+function startClock() {
+  const el = document.getElementById("clock");
+  const t  = () => el.textContent = new Date().toLocaleTimeString("ko-KR",{hour12:false});
+  t(); setInterval(t,1000);
+}
+
+// ── 데이터 로드 ────────────────────────────────
+async function loadAll() {
+  showLoad("데이터 로딩 중...");
+  try {
+    // PLAN 로드
+    const r1   = await fetch(URL+"?action=getPlan&containerNo="+encodeURIComponent(CFG.cont)+"&date="+CFG.date);
+    const d1   = await r1.json();
+    if (d1.status==="ok") PLAN = d1.plan.map(p=>({...p, boxEA:0, palletEA:0}));
+
+    // SCAN_LOG 로드 — 기존 스캔 누적 복원
+    // 날짜는 서버에서 필터링하지 않고 전체로 가져온 뒤, PLAN 항목 자신의 date(서버가 계산한 값)와
+    // 직접 비교한다. 클라이언트 시계/시간대 오차로 CFG.date가 어긋나도 영향받지 않도록 하기 위함.
+    const r2   = await fetch(URL+"?action=getScanLog&containerNo="+encodeURIComponent(CFG.cont));
+    const d2   = await r2.json();
+    if (d2.status==="ok") {
+      d2.logs.forEach(log => {
+        const item = PLAN.find(p=>p.qrKey===log.qrKey && p.date===log.date);
+        if (!item) return;
+        if (log.boxId) scannedBoxes.add(String(log.boxId).trim());
+        const t = (log.scanType||"BOX").toUpperCase();
+        if (t === "PALLET") item.palletEA += (Number(log.qty)||0);
+        else                 item.boxEA   += (Number(log.qty)||0);
+      });
+    }
+  } catch(e) {
+    PLAN=[];
+  }
+  hideLoad();
+  renderAll();
+}
+
+// ── 카메라 ────────────────────────────────────
+function initCam() {
+  scanner = new Html5Qrcode("qr-reader");
+  scanner.start(
+    {facingMode:"environment"},
+    {fps:12, qrbox:{width:220,height:220}},
+    onScan, ()=>{}
+  ).catch(()=>{
+    document.getElementById("qr-reader").innerHTML=
+      "<div style='padding:20px;text-align:center;color:#fff;font-size:13px'>카메라 접근 불가</div>";
+  });
+}
+
+function onScan(text) {
+  const now = Date.now();
+  if (text===lastQR && now-lastT<2500) return;
+  lastQR=text; lastT=now;
+  processBoxScan(text);
+}
+
+// ── BOX 스캔 처리 ─────────────────────────────
+function processBoxScan(rawQR) {
+  pending = null;
+  const card = document.getElementById("result");
+  card.style.display = "block";
+  document.getElementById("save-btn").style.display = "none";
+
+  // QR 파싱: QR_KEY|수량|고유ID  (BOX/PALLET 동일 형식, ID 첫글자로 구분: B=BOX, P=PALLET)
+  const parts   = rawQR.split("|");
+  const qrKey   = parts[0].trim();
+  const qty     = parseInt(parts[1]) || 1;
+  const boxId   = parts[2] ? parts[2].trim() : null;
+  const isPlt   = boxId && boxId.charAt(0).toUpperCase() === "P";
+  const typeLbl = isPlt ? "PALLET" : "BOX";
+
+  // 형식 자체가 잘못된 QR (구분자 없음)
+  if (!boxId) {
+    card.className = "result err";
+    card.innerHTML = `<div class="r-name">❌ 인식할 수 없는 QR</div>
+      <div class="r-msg err-txt">BOX/PALLET QR이 아닙니다</div>`;
+    return;
+  }
+
+  // 선택한 스캔 모드와 다른 종류의 QR을 찍은 경우
+  if (typeLbl !== CFG.mode) {
+    card.className = "result err";
+    card.innerHTML = `<div class="r-name">❌ 모드 불일치</div>
+      <div class="r-sub">${boxId}</div>
+      <div class="r-msg err-txt">현재 ${CFG.mode} 모드인데 ${typeLbl} QR을 스캔했습니다.<br>화면 상단의 모드를 확인하거나 다시 시작해서 모드를 전환하세요.</div>`;
+    vibrate([200,100,200]);
+    return;
+  }
+
+  // 중복 체크 (ID는 전역 고유 — BOX/PALLET 공통)
+  if (boxId && scannedBoxes.has(boxId)) {
+    card.className = "result dup";
+    card.innerHTML = `<div class="r-name">⚠ 중복 스캔</div>
+      <div class="r-sub">${boxId}</div>
+      <div class="r-msg warn-txt">이미 저장된 ${typeLbl}입니다</div>`;
+    vibrate([100]);
+    return;
+  }
+
+  // 품목 확인
+  const item = PLAN.find(p=>p.qrKey===qrKey);
+  if (!item && PLAN.length>0) {
+    card.className = "result err";
+    card.innerHTML = `<div class="r-name">❌ 오적재 감지!</div>
+      <div class="r-sub">${qrKey}</div>
+      <div class="r-msg err-txt">이 컨테이너 계획에 없는 품목</div>`;
+    vibrate([200,100,200]);
+    return;
+  }
+
+  const planItem  = item || {qrKey,partCode:qrKey,partName:qrKey,customer:"",planQty:null,boxEA:0,palletEA:0};
+  const planEA    = planItem.planQty || 0;
+  const nowEA     = (typeLbl === "PALLET" ? planItem.palletEA : planItem.boxEA) || 0;
+  const afterEA   = nowEA + qty;
+  const pct       = planEA ? Math.min(100,Math.round(afterEA/planEA*100)) : 0;
+
+  pending = {...planItem, rawQR, boxId, qty, scanType:typeLbl};
+
+  card.className = "result ok";
+  card.innerHTML = `
+    <div class="r-name">${planItem.partName}</div>
+    <div class="r-sub">${planItem.partCode} | ${planItem.customer}${boxId?" | "+boxId:""}</div>
+    <div class="qty-badge">
+      <div><div class="qty-lbl">이번 ${typeLbl}</div><div class="qty-num">${qty.toLocaleString()}</div></div>
+      <div style="text-align:right"><div class="qty-lbl">누적</div><div class="qty-unit">${afterEA.toLocaleString()}/${planEA?planEA.toLocaleString():"?"}EA</div></div>
+    </div>
+    <div class="prog-bg"><div class="prog-fill ${pct>=100?"fill-done":"fill-prog"}" style="width:${pct}%"></div></div>`;
+
+  document.getElementById("save-btn").style.display = "block";
+  document.getElementById("save-btn").disabled      = false;
+  document.getElementById("save-btn").textContent   = `✅ ${typeLbl} 저장`;
+  vibrate([50]);
+}
+
+// ── 저장 ──────────────────────────────────────
+async function doSave() {
+  if (!pending) return;
+  document.getElementById("save-btn").disabled = true;
+  await saveBox();
+}
+
+// ── 종합 현황 조회 (고객/BOX_QTY/PALLET_QTY/PLAN_QTY/최종판정) ──
+async function fetchStatus(qrKey) {
+  const box = document.getElementById("status-box");
+  if (!box) return;
+  try {
+    const res = await fetch(URL + "?action=getStatus&qrKey=" + encodeURIComponent(qrKey));
+    const data = await res.json();
+    if (data.status !== "ok" || !data.info) { box.textContent = ""; return; }
+    const info = data.info;
+    const okColor = info.passed ? "#16A34A" : "#B45309";
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;border-top:1px solid #E5E7EB;padding-top:8px;margin-top:4px">
+        <span style="font-weight:600">${info.customer||"-"}</span>
+        <span>PLAN ${info.planQty.toLocaleString()}EA</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px">
+        <span>📦 BOX ${info.boxQty.toLocaleString()}EA</span>
+        <span>🏗️ PALLET ${info.palletQty.toLocaleString()}EA</span>
+      </div>
+      <div style="margin-top:6px;font-weight:700;color:${okColor}">${info.result}</div>`;
+  } catch(e) {
+    box.textContent = "";
+  }
+}
+
+async function saveBox() {
+  const typeLbl = pending.scanType || "BOX";
+  showLoad(`${typeLbl} 저장 중...`);
+  let data;
+  try {
+    const res = await fetch(URL, {
+      method:"POST",
+      body: JSON.stringify({
+        action     : "scanBox",
+        qrKey      : pending.qrKey,
+        containerNo: CFG.cont,
+        qty        : pending.qty,
+        scanBy     : CFG.worker,
+        boxId      : pending.boxId || "",
+        scanType   : typeLbl,
+      }),
+    });
+    data = await res.json();
+  } catch(e) {
+    // ★ 실패를 숨기지 않고 정직하게 표시 (이전 버그 수정)
+    hideLoad();
+    const card = document.getElementById("result");
+    card.className = "result err";
+    card.innerHTML = `<div class="r-name">❌ 저장 실패 (통신 오류)</div>
+      <div class="r-sub">${pending.boxId||""}</div>
+      <div class="r-msg err-txt">네트워크/서버 연결 실패 — 다시 시도하세요</div>
+      <div class="r-sub" style="margin-top:6px;font-family:monospace;font-size:10px">${String(e).slice(0,80)}</div>`;
+    document.getElementById("save-btn").disabled = false;
+    vibrate([200,100,200]);
+    return;
+  }
+
+  hideLoad();
+
+  if (data && data.status==="ok") {
+    // 저장 성공 시에만 누적 반영
+    if (pending.boxId) scannedBoxes.add(pending.boxId);
+    const item = PLAN.find(p=>p.qrKey===pending.qrKey);
+    if (item) {
+      if (pending.scanType === "PALLET") item.palletEA = (item.palletEA||0) + pending.qty;
+      else                                item.boxEA    = (item.boxEA||0) + pending.qty;
+    }
+    renderAll();
+
+    const qrKeySaved = pending.qrKey;
+    const card = document.getElementById("result");
+    card.className = "result ok";
+    card.innerHTML = `<div class="r-name">✅ 저장 완료</div>
+      <div class="r-sub">${pending.partName||pending.qrKey}</div>
+      <div class="r-msg ok-txt">${data.msg||(typeLbl+" 저장되었습니다")}</div>
+      <div id="status-box" style="margin-top:8px;font-size:12px;color:var(--muted)">현황 조회 중...</div>`;
+
+    document.getElementById("save-btn").style.display = "none";
+    vibrate(data.isDone?[50,50,100,50,100]:[50]);
+    pending = null;
+
+    // ── 고객/BOX_QTY/PALLET_QTY/최종판정 종합 조회 ──
+    fetchStatus(qrKeySaved);
+  } else {
+    // 서버가 error 반환 (중복/마스터없음 등) — 정직하게 표시
+    const card = document.getElementById("result");
+    card.className = "result err";
+    card.innerHTML = `<div class="r-name">❌ 저장 거부됨</div>
+      <div class="r-msg err-txt">${(data&&data.msg)||"알 수 없는 오류"}</div>`;
+    document.getElementById("save-btn").disabled = false;
+    vibrate([200,100,200]);
+    pending = null;
+  }
+}
+
+// ── 렌더 ──────────────────────────────────────
+function renderAll() {
+  const total = PLAN.length;
+  const curEA = p => CFG.mode==='PALLET' ? (p.palletEA||0) : (p.boxEA||0);
+  const done  = PLAN.filter(p=>p.planQty&&curEA(p)>=p.planQty).length;
+  document.getElementById("k-plan").textContent = total;
+  document.getElementById("k-done").textContent = done;
+  document.getElementById("k-miss").textContent = total-done;
+  renderItemList();
+}
+
+function renderItemList() {
+  const ul = document.getElementById("item-list");
+  if (!PLAN.length) {
+    ul.innerHTML = "<li style='text-align:center;color:#6B7280;font-size:12px;padding:16px'>계획 데이터 없음<br>2.PLAN 시트를 확인하세요</li>";
+    return;
+  }
+  const modeLbl = CFG.mode==='PALLET' ? 'PALLET' : 'BOX';
+  ul.innerHTML = PLAN.map(p=>{
+    const plan  = p.planQty||0;
+    const ea    = CFG.mode==='PALLET' ? (p.palletEA||0) : (p.boxEA||0);
+    const done  = plan&&ea>=plan;
+    const prog  = ea>0&&!done;
+    const pct   = plan?Math.min(100,Math.round(ea/plan*100)):0;
+    const qc    = done?"color:#0F6E56":prog?"color:#1D4ED8":"color:#B91C1C";
+    const st    = done?`✅ ${modeLbl}완료`:prog?ea.toLocaleString()+"/"+plan.toLocaleString():"미스캔";
+    const bc    = done?"fill-done":"fill-prog";
+    return `<li class="li ${done?"done":prog?"prog":""}">
+      <div class="li-info">
+        <div class="li-name">${p.partName}</div>
+        <div class="li-code">${p.partCode}</div>
+        <div class="mini-bar"><div class="mini-fill ${bc}" style="width:${pct}%"></div></div>
+      </div>
+      <div class="li-right">
+        <div class="li-qty" style="${qc}">${ea.toLocaleString()}<span style="font-size:9px;color:#6B7280">/${plan?plan.toLocaleString():"?"}</span></div>
+        <div class="li-status" style="${qc}">${st}</div>
+      </div>
+    </li>`;
+  }).join("");
+}
+
+// ── 유틸 ──────────────────────────────────────
+function showLoad(t){ document.getElementById("loading-txt").textContent=t||"처리 중..."; document.getElementById("loading").classList.add("show"); }
+function hideLoad(){ document.getElementById("loading").classList.remove("show"); }
+function vibrate(p){ if(navigator.vibrate) navigator.vibrate(p); }
+</script>
+</body>
+</html>
